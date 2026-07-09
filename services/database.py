@@ -209,6 +209,14 @@ async def get_latest_summary(channel_id: int) -> str | None:
     return row["summary"] if row else None
 
 
+async def clear_channel_memory(channel_id: int) -> None:
+    """Delete all rolling messages and summaries for a specific channel."""
+    db = await get_db()
+    await db.execute("DELETE FROM messages WHERE channel_id = ?", (channel_id,))
+    await db.execute("DELETE FROM channel_summaries WHERE channel_id = ?", (channel_id,))
+    await db.commit()
+
+
 # ── Long-Term Memory ────────────────────────────────────────────────────────
 
 async def save_memory(
@@ -290,6 +298,13 @@ async def get_active_instructions() -> list[str]:
     )
     rows = await cursor.fetchall()
     return [row["instruction"] for row in rows]
+
+
+async def clear_instructions() -> None:
+    """Deactivate all owner instructions."""
+    db = await get_db()
+    await db.execute("UPDATE owner_instructions SET active = 0")
+    await db.commit()
 
 
 # ── Emoji Owners ─────────────────────────────────────────────────────────────

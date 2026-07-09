@@ -185,6 +185,103 @@ class CommandsCog(commands.Cog):
             ephemeral=True,
         )
 
+    # ── /do (owner-only) ─────────────────────────────────────────────
+
+    @app_commands.command(
+        name="do",
+        description="[Owner only] Command Nixi to immediately say or do something.",
+    )
+    @app_commands.describe(
+        action="What should Nixi say or do?"
+    )
+    async def do_action(
+        self, interaction: discord.Interaction, action: str
+    ) -> None:
+        if interaction.user.id != config.OWNER_ID:
+            await interaction.response.send_message(
+                "I take my orders from the Young Master alone, I'm afraid.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(thinking=True)
+        persona = config.load_persona()
+        context = [
+            {"role": "system", "content": persona},
+            {
+                "role": "system",
+                "content": (
+                    "The Young Master has given you a direct command: "
+                    f"'{action}'. "
+                    "Fulfill this command immediately, speaking in character. "
+                    "Output ONLY what you would say in response, with no conversational filler."
+                ),
+            },
+        ]
+        
+        reply = await llm.generate_response(context, temperature=0.7)
+        guild = interaction.guild
+        reply = await emoji_filter.filter_response(reply, guild)
+
+        await interaction.followup.send(reply)
+        
+        # Log to memory so it has context of its own words
+        guild_id = interaction.guild.id if interaction.guild else None
+        await memory.log_message(
+            channel_id=interaction.channel_id,  # type: ignore[arg-type]
+            guild_id=guild_id,
+            author_id=self.bot.user.id,  # type: ignore[union-attr]
+            author_name="Nixi",
+            content=reply,
+            is_bot=True,
+        )
+
+    # ── /clear (owner-only) ──────────────────────────────────────────
+
+    @app_commands.command(
+        name="clear",
+        description="[Owner only] Clears all previous standing instructions.",
+    )
+    async def clear_instructions(
+        self, interaction: discord.Interaction
+    ) -> None:
+        if interaction.user.id != config.OWNER_ID:
+            await interaction.response.send_message(
+                "Only the Young Master may alter my standing orders.",
+                ephemeral=True,
+            )
+            return
+            
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await db.clear_instructions()
+        await interaction.followup.send(
+            "Very good, M'Lord. All previous standing instructions have been cleared from my mind.",
+            ephemeral=True,
+        )
+
+    # ── /restart (owner-only) ────────────────────────────────────────
+
+    @app_commands.command(
+        name="restart",
+        description="[Owner only] Refreshes Nixi's memory of the current conversation.",
+    )
+    async def restart_memory(
+        self, interaction: discord.Interaction
+    ) -> None:
+        if interaction.user.id != config.OWNER_ID:
+            await interaction.response.send_message(
+                "I beg your pardon, but only the Young Master may order a memory wipe.",
+                ephemeral=True,
+            )
+            return
+            
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await db.clear_channel_memory(interaction.channel_id)  # type: ignore[arg-type]
+        await interaction.followup.send(
+            "My mind is refreshed for this channel, M'Lord. Shall we begin anew?",
+            ephemeral=True,
+        )
+
     # ── !sync (prefix, owner-only) ───────────────────────────────────────
 
     @commands.command(name="sync")
