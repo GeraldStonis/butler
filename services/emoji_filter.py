@@ -55,21 +55,13 @@ async def cache_emojis(bot: Bot) -> None:
 def get_emoji_context(guild: discord.Guild | None) -> str | None:
     """
     Build a system-prompt block listing all custom emojis in the guild
-    so the LLM can weave them into its replies naturally.
-
-    Returns None if there's no guild or no custom emojis.
+    so the LLM can weave them into its replies naturally using their names.
     """
     if not guild or not guild.emojis:
         return None
 
-    # Build a compact list: <:name:id> for static, <a:name:id> for animated
-    emoji_strs = []
-    for e in guild.emojis:
-        if e.animated:
-            emoji_strs.append(f"<a:{e.name}:{e.id}>")
-        else:
-            emoji_strs.append(f"<:{e.name}:{e.id}>")
-
+    # Just give the names: :name1:, :name2:
+    emoji_strs = [f":{e.name}:" for e in guild.emojis]
     emoji_list = ", ".join(emoji_strs)
 
     return (
@@ -79,8 +71,7 @@ def get_emoji_context(guild: discord.Guild | None) -> str | None:
         "standard Unicode emojis — they are the server's personality. "
         "Use them naturally: to punctuate a joke, react to something, express "
         "emotion, or even send an emoji-only reply when the vibe calls for it. "
-        "Copy-paste the EXACT syntax shown (including the angle brackets, "
-        "colons, and ID numbers) — do NOT invent emoji names or IDs.\n\n"
+        "Use the exact name surrounded by colons.\n\n"
         f"Available emojis: {emoji_list}\n\n"
         "Guidelines:\n"
         "- Use 1-3 emojis per message typically; more for emphasis or comedy\n"
@@ -109,35 +100,51 @@ def _pick_random_emoji(guild: discord.Guild) -> str:
 async def filter_response(text: str, guild: discord.Guild | None) -> str:
     """
     Post-process an LLM response:
-    1. Strip any custom emoji the LLM hallucinated (ID not in guild).
-    2. If no real custom emoji survived, append a random one.
+    1. Replace :emoji_name: with Discord's <a:name:id> format.
+    2. Strip any hallucinated custom emojis.
+    3. If no real custom emoji survived, append a random one.
 
     In DMs (guild is None), strip all custom emoji since they won't render.
     """
     if not guild:
-        # In DMs, strip all custom emoji (they won't render anyway)
+        # In DMs, strip all custom emoji formats
+        text = re.sub(r":(\w+):", "", text)
         return CUSTOM_EMOJI_RE.sub("", text).strip()
 
     if not guild.emojis:
-        # Guild has no custom emojis — nothing to inject
+        text = re.sub(r":(\w+):", "", text)
         return CUSTOM_EMOJI_RE.sub("", text).strip()
 
+    emoji_map = {e.name: e for e in guild.emojis}
     valid_ids = _get_guild_emoji_ids(guild)
     kept_count = 0
 
-    def _replace(match: re.Match) -> str:
+    # 1. Strip any hallucinated <a:name:id> syntaxes the LLM might still output
+    def _strip_invalid_id(match: re.Match) -> str:
         nonlocal kept_count
         emoji_id_str = match.group(2)
-        if emoji_id_str:
-            emoji_id = int(emoji_id_str)
-            if emoji_id in valid_ids:
-                kept_count += 1
-                return match.group(0)  # keep valid emoji
-        return ""  # strip hallucinated or invalid emoji
+        if emoji_id_str and int(emoji_id_str) in valid_ids:
+            kept_count += 1
+            return match.group(0)
+        return ""
+    text = CUSTOM_EMOJI_RE.sub(_strip_invalid_id, text)
 
-    filtered = CUSTOM_EMOJI_RE.sub(_replace, text)
-    # Clean up any double spaces left by removal
-    filtered = re.sub(r"  +", " ", filtered).strip()
+    # 2. Replace :name: with the correct <a:name:id> Discord syntax
+    def _replace_name(match: re.Match) -> str:
+        nonlocal kept_count
+        name = match.group(1)
+        if name in emoji_map:
+            e = emoji_map[name]
+            kept_count += 1
+            prefix = "a" if e.animated else ""
+            return f"<{prefix}:{e.name}:{e.id}>"
+        # Leave non-custom emojis alone (e.g. standard ones the LLM typed)
+        return match.group(0)
+        
+    text = re.sub(r":(\w+):", _replace_name, text)
+
+    # Clean up any double spaces
+    filtered = re.sub(r"  +", " ", text).strip()
 
     # Guarantee at least one server emoji in the response
     if kept_count == 0 and filtered:

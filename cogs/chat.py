@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-
 import discord
 from discord.ext import commands
 
@@ -32,6 +31,8 @@ class ChatCog(commands.Cog):
         self._boss_patterns: list[str] = [
             name.lower() for name in config.OWNER_NAMES
         ]
+        # Additional trigger words
+        self._trigger_words: list[str] = ["butler", "servant", "nixi"]
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -154,6 +155,11 @@ class ChatCog(commands.Cog):
         for name in self._boss_patterns:
             if name in content_lower:
                 return "BOSS_MENTIONED"
+
+        import re
+        for word in self._trigger_words:
+            if re.search(r'\b' + re.escape(word) + r'\b', content_lower):
+                return "DIRECT_ADDRESS"
 
         return None
 
