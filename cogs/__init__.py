@@ -1,0 +1,1 @@
+# Nixi bot cogs package

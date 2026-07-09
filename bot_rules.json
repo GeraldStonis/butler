@@ -1,0 +1,36 @@
+{
+    "watched_bots": [
+        {
+            "bot_id": 0,
+            "name": "ExamplePokemonBot",
+            "rules": [
+                {
+                    "type": "embed_title_contains",
+                    "pattern": "wild .+ appeared",
+                    "rarity_keywords": ["legendary", "mythical", "shiny", "rare", "ultra beast"],
+                    "alert": "A rare creature has made itself known, Young Master! {details}"
+                },
+                {
+                    "type": "content_contains",
+                    "pattern": "daily reward|daily streak",
+                    "cooldown_seconds": 43200,
+                    "alert": "Your daily reward awaits collection, M'Lord. One would hate to see it go unclaimed."
+                }
+            ]
+        },
+        {
+            "bot_id": 0,
+            "name": "ExampleEconomyBot",
+            "rules": [
+                {
+                    "type": "content_contains",
+                    "pattern": "you can now claim|daily is ready|work cooldown.*over",
+                    "cooldown_seconds": 3600,
+                    "alert": "A gentle reminder, sir — there may be funds or duties awaiting your attention."
+                }
+            ]
+        }
+    ],
+    "alert_channel_id": null,
+    "alert_via_dm": true
+}
