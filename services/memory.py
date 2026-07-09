@@ -133,7 +133,6 @@ async def build_context(
             "content": emoji_context,
         })
 
-    # Hard rule: enforce script choice right before generation
     messages.append({
         "role": "system",
         "content": (
@@ -142,7 +141,8 @@ async def build_context(
             "(Latin letters) only. Example: 'arre bhai mast hoon' NOT "
             "'अरे भाई मस्त हूं'. NEVER use Devanagari or any non-Latin script "
             "unless quoting a single word for comedic effect. This is Discord "
-            "chat — type like real people type online."
+            "chat — type like real people type online.\n\n"
+            "DO NOT prepend your messages with '[Nixi]:' or 'Nixi:'. Just output your response directly."
         ),
     })
 

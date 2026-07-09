@@ -26,8 +26,9 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("nixi.emoji")
 
-# Regex matching Discord custom emoji syntax: <:name:id> or <a:name:id>
-CUSTOM_EMOJI_RE = re.compile(r"<a?:(\w+):(\d+)>")
+# Regex matching Discord custom emoji syntax: <:name:id>, <a:name:id>
+# and hallucinated emojis like <:name:> without IDs
+CUSTOM_EMOJI_RE = re.compile(r"<a?:(\w+)(?::(\d+))?>")
 
 
 # ── Startup Cache ────────────────────────────────────────────────────────────
@@ -126,11 +127,13 @@ async def filter_response(text: str, guild: discord.Guild | None) -> str:
 
     def _replace(match: re.Match) -> str:
         nonlocal kept_count
-        emoji_id = int(match.group(2))
-        if emoji_id in valid_ids:
-            kept_count += 1
-            return match.group(0)  # keep valid emoji
-        return ""  # strip hallucinated emoji
+        emoji_id_str = match.group(2)
+        if emoji_id_str:
+            emoji_id = int(emoji_id_str)
+            if emoji_id in valid_ids:
+                kept_count += 1
+                return match.group(0)  # keep valid emoji
+        return ""  # strip hallucinated or invalid emoji
 
     filtered = CUSTOM_EMOJI_RE.sub(_replace, text)
     # Clean up any double spaces left by removal

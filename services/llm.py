@@ -8,6 +8,7 @@ Connects to https://ollama.com with Bearer token auth.
 from __future__ import annotations
 
 import logging
+import re
 from ollama import AsyncClient
 
 import config
@@ -57,7 +58,12 @@ async def generate_response(
             },
         )
         content = response.message.content
-        return content.strip() if content else ""
+        if content:
+            content = content.strip()
+            # Strip bot name prefixes if the LLM hallucinates them
+            content = re.sub(r"^(?:\[)?Nixi(?:\])?:\s*", "", content, flags=re.IGNORECASE)
+            return content
+        return ""
     except Exception:
         log.exception("LLM call failed")
         return (
