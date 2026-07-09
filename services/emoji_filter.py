@@ -100,12 +100,22 @@ def _pick_random_emoji(guild: discord.Guild) -> str:
 async def filter_response(text: str, guild: discord.Guild | None) -> str:
     """
     Post-process an LLM response:
-    1. Replace :emoji_name: with Discord's <a:name:id> format.
-    2. Strip any hallucinated custom emojis.
-    3. If no real custom emoji survived, append a random one.
+    1. Resolve @username mentions to real Discord <@user_id> tags.
+    2. Replace :emoji_name: with Discord's <a:name:id> format.
+    3. Strip any hallucinated custom emojis.
+    4. If no real custom emoji survived, append a random one.
 
     In DMs (guild is None), strip all custom emoji since they won't render.
     """
+    if guild:
+        # Resolve @username to real <@user_id> mentions
+        sorted_members = sorted(guild.members, key=lambda m: len(m.display_name), reverse=True)
+        for member in sorted_members:
+            pattern = re.compile(r"@" + re.escape(member.display_name) + r"(?!\w)", re.IGNORECASE)
+            text = pattern.sub(f"<@{member.id}>", text)
+            if member.name != member.display_name:
+                pattern2 = re.compile(r"@" + re.escape(member.name) + r"(?!\w)", re.IGNORECASE)
+                text = pattern2.sub(f"<@{member.id}>", text)
     if not guild:
         # In DMs, strip all custom emoji formats
         text = re.sub(r":(\w+):", "", text)

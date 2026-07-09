@@ -142,6 +142,8 @@ async def build_context(
             "'अरे भाई मस्त हूं'. NEVER use Devanagari or any non-Latin script "
             "unless quoting a single word for comedic effect. This is Discord "
             "chat — type like real people type online.\n\n"
+            "When addressing or referring to a specific user (other than the Young Master), "
+            "prefix their name with an @ symbol (e.g. '@chingu').\n\n"
             "DO NOT prepend your messages with '[Nixi]:' or 'Nixi:'. Just output your response directly."
         ),
     })
