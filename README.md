@@ -25,6 +25,7 @@ The key design rule is simple:
   - Broad aliases like "Pokemon" are no longer used.
 - Optional morning news briefing.
 - Optional dead-chat nudges after channel inactivity.
+- Optional random server sticker spam in a configured channel.
 - Rolling channel memory, summaries, long-term memories, and owner instructions.
 - Server emoji support without forcing an emoji into every reply.
 - Bot watcher rules for alerts from other bots.
@@ -86,10 +87,17 @@ DEAD_CHAT_ENABLED=false
 DEAD_CHAT_IDLE_SECONDS=300
 DEAD_CHAT_COOLDOWN_SECONDS=3600
 DEAD_CHAT_CHANNEL_IDS=
+
+STICKER_SPAM_ENABLED=false
+STICKER_SPAM_CHANNEL_ID=
+STICKER_SPAM_INTERVAL_SECONDS=60
 ```
 
 `DEAD_CHAT_CHANNEL_IDS` may be left empty to consider channels Nixi has seen
 activity in, or set to comma-separated channel IDs.
+
+Set `STICKER_SPAM_CHANNEL_ID` to your spam channel ID to send one random server
+sticker every `STICKER_SPAM_INTERVAL_SECONDS`.
 
 ## Project Structure
 

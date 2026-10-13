@@ -1,4 +1,4 @@
-"""Scheduled household tasks: morning news and dead-chat nudges."""
+"""Scheduled household tasks: morning news, dead-chat nudges, and stickers."""
 
 from __future__ import annotations
 
@@ -22,9 +22,14 @@ class HousekeepingCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.housekeeping_loop.start()
+        self.sticker_spam_loop.change_interval(
+            seconds=max(10, config.STICKER_SPAM_INTERVAL_SECONDS)
+        )
+        self.sticker_spam_loop.start()
 
     def cog_unload(self) -> None:
         self.housekeeping_loop.cancel()
+        self.sticker_spam_loop.cancel()
 
     @tasks.loop(seconds=60)
     async def housekeeping_loop(self) -> None:
@@ -33,6 +38,14 @@ class HousekeepingCog(commands.Cog):
 
     @housekeeping_loop.before_loop
     async def before_housekeeping(self) -> None:
+        await self.bot.wait_until_ready()
+
+    @tasks.loop(seconds=60)
+    async def sticker_spam_loop(self) -> None:
+        await self._maybe_send_random_sticker()
+
+    @sticker_spam_loop.before_loop
+    async def before_sticker_spam(self) -> None:
         await self.bot.wait_until_ready()
 
     async def _maybe_send_morning_news(self) -> None:
@@ -105,6 +118,26 @@ class HousekeepingCog(commands.Cog):
             if not member.bot and member.id != config.OWNER_ID
         ]
         return random.choice(eligible) if eligible else None
+
+    async def _maybe_send_random_sticker(self) -> None:
+        if not config.STICKER_SPAM_ENABLED or not config.STICKER_SPAM_CHANNEL_ID:
+            return
+
+        channel = self.bot.get_channel(config.STICKER_SPAM_CHANNEL_ID)
+        if not isinstance(channel, discord.TextChannel) or not channel.guild:
+            log.warning("Sticker spam channel not found: %d", config.STICKER_SPAM_CHANNEL_ID)
+            return
+
+        stickers = list(channel.guild.stickers)
+        if not stickers:
+            log.warning("Guild %s has no stickers to spam", channel.guild.name)
+            return
+
+        sticker = random.choice(stickers)
+        try:
+            await channel.send(stickers=[sticker])
+        except discord.HTTPException:
+            log.exception("Failed to send sticker %s to #%s", sticker.name, channel.name)
 
 
 async def setup(bot: commands.Bot) -> None:
