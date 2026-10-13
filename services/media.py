@@ -20,6 +20,11 @@ class MediaResult:
     title: str
     url: str
     source_url: str = ""
+    attribution: str = ""
+
+    @property
+    def discord_content(self) -> str:
+        return f"{self.url}\n{self.attribution}" if self.attribution else self.url
 
 
 SAFE_ACTION_QUERIES = {
@@ -51,7 +56,42 @@ async def fetch_meme() -> MediaResult | None:
 
 
 async def fetch_gif(query: str) -> MediaResult | None:
-    """Fetch a GIF from Tenor if TENOR_API_KEY is configured."""
+    """Fetch a GIPHY GIF, using legacy Tenor only when GIPHY is unset."""
+    if config.GIPHY_API_KEY:
+        params = {
+            "api_key": config.GIPHY_API_KEY,
+            "q": query[:50],
+            "limit": 1,
+            "rating": "pg" if config.MEDIA_SAFE_MODE else "r",
+        }
+        # HTTP exceptions include the request URL, which contains the API key.
+        try:
+            async with httpx.AsyncClient(timeout=12) as client:
+                response = await client.get("https://api.giphy.com/v1/gifs/search", params=params)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            raise RuntimeError(f"GIPHY request failed (HTTP {status})") from None
+        except httpx.RequestError:
+            raise RuntimeError("Could not connect to GIPHY") from None
+        results = data.get("data", [])
+        if not results:
+            return None
+        item = results[0]
+        images = item.get("images", {})
+        rendition = images.get("downsized") or images.get("original") or {}
+        url = rendition.get("url")
+        if not url:
+            url = images.get("original", {}).get("url")
+        if not url:
+            return None
+        return MediaResult(
+            title=item.get("title") or query,
+            url=url,
+            source_url=item.get("url", ""),
+            attribution="Powered By GIPHY",
+        )
     if not config.TENOR_API_KEY:
         return None
     params = {
@@ -82,7 +122,7 @@ async def fetch_gif(query: str) -> MediaResult | None:
 
 
 async def fetch_image(query: str) -> MediaResult | None:
-    """Fetch an image using Brave when configured, with an Unsplash fallback."""
+    """Fetch an image using the configured search provider."""
     results = await search.image_search(query, count=8)
     if results:
         item = random.choice(results)

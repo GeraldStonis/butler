@@ -65,8 +65,10 @@ CONTEXT_WINDOW_SIZE: int = int(os.environ.get("CONTEXT_WINDOW_SIZE", "100"))
 SUMMARY_THRESHOLD: int = int(os.environ.get("SUMMARY_THRESHOLD", "50"))
 
 # Owner-only web/media tools
+TAVILY_API_KEY: str = os.environ.get("TAVILY_API_KEY", "")
 BRAVE_SEARCH_API_KEY: str = os.environ.get("BRAVE_SEARCH_API_KEY", "")
 TENOR_API_KEY: str = os.environ.get("TENOR_API_KEY", "")
+GIPHY_API_KEY: str = os.environ.get("GIPHY_API_KEY", "")
 MEDIA_SAFE_MODE: bool = _bool_env("MEDIA_SAFE_MODE", True)
 
 # Morning news

@@ -63,11 +63,11 @@ async def execute_owner_intent(
             result = await media.fetch_gif(query)
             if not result:
                 await message.reply(
-                    "I can fetch GIFs once TENOR_API_KEY is configured. At present I can only mime dramatically.",
+                    "I could not find a GIF for that request. My dramatic mime will have to wait.",
                     mention_author=False,
                 )
                 return True
-            await message.reply(result.url, mention_author=False)
+            await message.reply(result.discord_content, mention_author=False)
             return True
 
         if name == "meme":
@@ -84,7 +84,7 @@ async def execute_owner_intent(
                 await message.reply(f"I could not procure {name}. The pantry is in disgrace.", mention_author=False)
                 return True
             label = "Tea service" if name == "tea" else "Coffee service"
-            await message.reply(f"{label}, as requested.\n{result.url}", mention_author=False)
+            await message.reply(f"{label}, as requested.\n{result.discord_content}", mention_author=False)
             return True
 
         if name == "action_gif":
@@ -92,12 +92,12 @@ async def execute_owner_intent(
             target = f"<@{owner_intent.target_user_id}>" if owner_intent.target_user_id else "the intended party"
             if not result:
                 await message.reply(
-                    "I can perform such theatrics once TENOR_API_KEY is configured. For now, consider this a stern eyebrow.",
+                    "I could not find a suitable reaction GIF. For now, consider this a stern eyebrow.",
                     mention_author=False,
                 )
                 return True
             await message.channel.send(
-                f"{target}, the Young Master has requested a little slapstick diplomacy.\n{result.url}"
+                f"{target}, the Young Master has requested a little slapstick diplomacy.\n{result.discord_content}"
             )
             return True
 

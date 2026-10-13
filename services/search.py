@@ -24,6 +24,42 @@ class SearchItem:
     image_url: str = ""
 
 
+async def _tavily_search(
+    query: str, count: int, *, news: bool = False, images: bool = False
+) -> dict:
+    payload = {
+        "query": query,
+        "max_results": max(1, min(count, 20)),
+        "search_depth": "basic",
+        "topic": "news" if news else "general",
+        "include_images": images,
+        "include_image_descriptions": images,
+        "safe_search": config.MEDIA_SAFE_MODE,
+    }
+    if news:
+        payload["time_range"] = "day"
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.post(
+            "https://api.tavily.com/search",
+            headers={"Authorization": f"Bearer {config.TAVILY_API_KEY}"},
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def _tavily_items(data: dict) -> list[SearchItem]:
+    return [
+        SearchItem(
+            title=item.get("title") or "Untitled",
+            url=item["url"],
+            description=item.get("content") or "",
+        )
+        for item in data.get("results", [])
+        if item.get("url")
+    ]
+
+
 async def _brave_get(path: str, params: dict[str, str | int]) -> dict | None:
     if not config.BRAVE_SEARCH_API_KEY:
         return None
@@ -38,7 +74,9 @@ async def _brave_get(path: str, params: dict[str, str | int]) -> dict | None:
 
 
 async def web_search(query: str, count: int = 5) -> list[SearchItem]:
-    """Run a Brave web search and return normalized results."""
+    """Search with Tavily, or Brave when Tavily is not configured."""
+    if config.TAVILY_API_KEY:
+        return _tavily_items(await _tavily_search(query, count))
     data = await _brave_get("/web/search", {"q": query, "count": count})
     if not data:
         return []
@@ -55,7 +93,9 @@ async def web_search(query: str, count: int = 5) -> list[SearchItem]:
 
 
 async def news_search(query: str, count: int = 8) -> list[SearchItem]:
-    """Run a Brave news search and return normalized results."""
+    """Search the past day's news."""
+    if config.TAVILY_API_KEY:
+        return _tavily_items(await _tavily_search(query, count, news=True))
     data = await _brave_get("/news/search", {"q": query, "count": count, "freshness": "pd"})
     if not data:
         return []
@@ -72,7 +112,19 @@ async def news_search(query: str, count: int = 8) -> list[SearchItem]:
 
 
 async def image_search(query: str, count: int = 6) -> list[SearchItem]:
-    """Run a Brave image search and return normalized results."""
+    """Return query-related images from the configured search provider."""
+    if config.TAVILY_API_KEY:
+        data = await _tavily_search(query, count, images=True)
+        items = []
+        for item in data.get("images", []):
+            url = item if isinstance(item, str) else item.get("url")
+            description = "" if isinstance(item, str) else item.get("description") or ""
+            if url:
+                items.append(SearchItem(
+                    title=description or query, url=url,
+                    description=description, image_url=url,
+                ))
+        return items[:count]
     data = await _brave_get("/images/search", {"q": query, "count": count, "safesearch": "strict"})
     if not data:
         return []
@@ -95,9 +147,9 @@ async def image_search(query: str, count: int = 6) -> list[SearchItem]:
 
 async def summarize_results(query: str, results: list[SearchItem], mode: str = "search") -> str:
     """Create a short Nixi-style summary with source links."""
-    if not config.BRAVE_SEARCH_API_KEY:
+    if not (config.TAVILY_API_KEY or config.BRAVE_SEARCH_API_KEY):
         return (
-            "I can search the web once BRAVE_SEARCH_API_KEY is configured. "
+            "I can search the web once TAVILY_API_KEY is configured. "
             "At present, my opera glasses are decorative."
         )
     if not results:

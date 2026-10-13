@@ -64,11 +64,17 @@ Nixi starts without these, but the related features will politely decline until
 configured.
 
 ```env
+TAVILY_API_KEY=
 BRAVE_SEARCH_API_KEY=
 TENOR_API_KEY=
+GIPHY_API_KEY=
 ```
 
-Brave powers web/news/image search. Tenor powers GIFs and action GIFs.
+Tavily powers web/news/image search. Brave is an optional legacy alternative
+used when Tavily is not configured. GIPHY powers GIFs and action GIFs;
+Tenor is a legacy fallback when GIPHY is not configured.
+GIPHY messages include attribution. Its standard API documentation requires
+client-side searches; contact GIPHY about approval for this server-side bot integration.
 
 ## Important Config
 
@@ -112,7 +118,7 @@ cogs/housekeeping.py    Morning news and dead-chat tasks
 cogs/watcher.py         Other-bot alert watcher
 services/actions.py     Owner action execution
 services/intent.py      Natural language intent classifier
-services/search.py      Brave web/news/image search
+services/search.py      Tavily/Brave web/news/image search
 services/media.py       Meme/GIF/image helpers
 services/memory.py      Conversation memory
 services/database.py    SQLite persistence
