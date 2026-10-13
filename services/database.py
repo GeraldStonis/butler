@@ -113,6 +113,42 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             value      TEXT NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS member_profiles (
+            guild_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            display_name TEXT NOT NULL,
+            username TEXT NOT NULL,
+            PRIMARY KEY (guild_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS member_facts (
+            guild_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            fact_key TEXT NOT NULL,
+            content TEXT NOT NULL,
+            evidence TEXT NOT NULL,
+            source TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (guild_id, user_id, fact_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS member_profiles (
+            guild_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            display_name TEXT NOT NULL,
+            username TEXT NOT NULL,
+            PRIMARY KEY (guild_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS member_facts (
+            guild_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            fact_key TEXT NOT NULL,
+            content TEXT NOT NULL,
+            evidence TEXT NOT NULL,
+            source TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (guild_id, user_id, fact_key)
+        );
     """)
     await db.commit()
 
@@ -263,7 +299,7 @@ async def get_recent_messages(
     limit = limit or config.CONTEXT_WINDOW_SIZE
     db = await get_db()
     cursor = await db.execute(
-        """SELECT author_name, is_bot, content, created_at
+        """SELECT author_id, author_name, is_bot, content, created_at
            FROM messages
            WHERE channel_id = ?
            ORDER BY created_at DESC
@@ -273,6 +309,7 @@ async def get_recent_messages(
     rows = await cursor.fetchall()
     return [
         {
+            "author_id": row["author_id"],
             "author": row["author_name"],
             "is_bot": bool(row["is_bot"]),
             "content": row["content"],
@@ -359,6 +396,78 @@ async def clear_channel_memory(channel_id: int) -> None:
     await db.execute("DELETE FROM messages WHERE channel_id = ?", (channel_id,))
     await db.execute("DELETE FROM channel_summaries WHERE channel_id = ?", (channel_id,))
     await db.commit()
+
+
+async def update_member_profile(guild_id: int, user_id: int, display_name: str, username: str) -> None:
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO member_profiles VALUES (?, ?, ?, ?)
+           ON CONFLICT(guild_id, user_id) DO UPDATE SET
+           display_name=excluded.display_name, username=excluded.username""",
+        (guild_id, user_id, display_name, username),
+    )
+    await db.commit()
+
+
+async def save_member_fact(guild_id: int, user_id: int, fact_key: str, content: str, evidence: str, source: str = "self_report") -> None:
+    db = await get_db()
+    # An owner-curated note cannot be overwritten by automatic extraction.
+    await db.execute(
+        """INSERT INTO member_facts (guild_id, user_id, fact_key, content, evidence, source)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(guild_id, user_id, fact_key) DO UPDATE SET
+           content=excluded.content, evidence=excluded.evidence, source=excluded.source,
+           updated_at=CURRENT_TIMESTAMP
+           WHERE member_facts.source != 'owner_note' OR excluded.source = 'owner_note'""",
+        (guild_id, user_id, fact_key, content[:400], evidence[:1000], source),
+    )
+    await db.commit()
+
+
+async def get_member_facts(guild_id: int, user_id: int, limit: int = 12) -> list[dict]:
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT fact_key, content, evidence, source FROM member_facts
+           WHERE guild_id=? AND user_id=? ORDER BY updated_at DESC LIMIT ?""",
+        (guild_id, user_id, limit),
+    )
+    return [dict(row) for row in await cursor.fetchall()]
+
+
+async def update_member_profile(guild_id: int, user_id: int, display_name: str, username: str) -> None:
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO member_profiles VALUES (?, ?, ?, ?)
+           ON CONFLICT(guild_id, user_id) DO UPDATE SET
+           display_name=excluded.display_name, username=excluded.username""",
+        (guild_id, user_id, display_name, username),
+    )
+    await db.commit()
+
+
+async def save_member_fact(guild_id: int, user_id: int, fact_key: str, content: str, evidence: str, source: str = "self_report") -> None:
+    db = await get_db()
+    # An owner-curated note cannot be overwritten by automatic extraction.
+    await db.execute(
+        """INSERT INTO member_facts (guild_id, user_id, fact_key, content, evidence, source)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(guild_id, user_id, fact_key) DO UPDATE SET
+           content=excluded.content, evidence=excluded.evidence, source=excluded.source,
+           updated_at=CURRENT_TIMESTAMP
+           WHERE member_facts.source != 'owner_note' OR excluded.source = 'owner_note'""",
+        (guild_id, user_id, fact_key, content[:400], evidence[:1000], source),
+    )
+    await db.commit()
+
+
+async def get_member_facts(guild_id: int, user_id: int, limit: int = 12) -> list[dict]:
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT fact_key, content, evidence, source FROM member_facts
+           WHERE guild_id=? AND user_id=? ORDER BY updated_at DESC LIMIT ?""",
+        (guild_id, user_id, limit),
+    )
+    return [dict(row) for row in await cursor.fetchall()]
 
 
 # ── Long-Term Memory ────────────────────────────────────────────────────────

@@ -30,6 +30,21 @@ The key design rule is simple:
 - Server emoji support without forcing an emoji into every reply.
 - Bot watcher rules for alerts from other bots.
 
+## Member Memory And Resets
+
+Use the owner-only `/reset-memory` slash command to clear this channel's messages
+and summary, keeping member profiles, standing instructions, and activity timers.
+Remembering member details is automatic; there are no manual memory actions.
+
+Member profiles are keyed by server ID and Discord user ID. Names update from
+Discord, so renames do not lose facts and matching names do not merge people.
+During conversations with Nixi and clear self-reports in server chat (for example,
+"I prefer coffee"), preferences and interests are learned in the background without
+posting a reply just to acknowledge learning. The extractor reads only the member's message,
+requires a supporting quote, and replaces older values for the same topic.
+It does not scan old server history or import ambiguous legacy conversation facts.
+The existing owner-only `/restart` also resets the current channel's recent memory.
+
 ## Setup
 
 Install dependencies:

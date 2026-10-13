@@ -30,7 +30,7 @@ def _strip_bot_name(text: str) -> str:
 
 def _first_mention_id(mentions: list) -> int | None:
     for user in mentions:
-        if getattr(user, "id", None) != config.OWNER_ID:
+        if getattr(user, "id", None) != config.OWNER_ID and not getattr(user, "bot", False):
             return user.id
     return None
 
@@ -50,13 +50,21 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
         topic = re.sub(r"\b(fetch|get|give|me|the|morning|news|briefing|headlines|today'?s)\b", "", lower)
         return OwnerIntent("news", query=topic.strip() or ", ".join(config.MORNING_NEWS_TOPICS))
 
-    if re.search(r"\b(send|fetch|get|share).*\bmeme\b|\bmeme\b", lower):
+    if (
+        lower.strip(" .!?\n") in {"meme", "memes"}
+        or re.search(r"\b(send|fetch|get|share|give|gimme|show|another|more)\b.*\bmemes?\b", lower)
+        or re.search(r"\bmemes?\s+(?:please|pls)\b", lower)
+    ):
         return OwnerIntent("meme")
 
-    if re.search(r"\b(tea|chai)\b", lower) and re.search(r"\b(send|fetch|get|share|image|gif|cup|please|pls)\b", lower):
+    if re.search(r"\b(tea|chai)\b", lower) and re.search(r"\b(send|fetch|get|share|serve|bring|pour|brew|image|gifs?|cup|please|pls)\b", lower):
+        if re.search(r"\bgifs?\b", lower):
+            return OwnerIntent("gif_search", query="tea serving")
         return OwnerIntent("tea")
 
-    if re.search(r"\b(coffee|espresso|latte)\b", lower) and re.search(r"\b(send|fetch|get|share|image|gif|cup|please|pls)\b", lower):
+    if re.search(r"\b(coffee|espresso|latte)\b", lower) and re.search(r"\b(send|fetch|get|share|serve|bring|pour|brew|image|gifs?|cup|please|pls)\b", lower):
+        if re.search(r"\bgifs?\b", lower):
+            return OwnerIntent("gif_search", query="coffee serving")
         return OwnerIntent("coffee")
 
     if lower.strip() in {"tea", "chai"}:

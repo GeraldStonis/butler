@@ -18,6 +18,7 @@ from discord.ext import commands
 
 import config
 from services import llm, memory, emoji_filter, database as db
+from services.response_text import requests_links
 
 log = logging.getLogger("nixi.commands")
 
@@ -59,6 +60,7 @@ class CommandsCog(commands.Cog):
             mode="ASK_COMMAND",
             guild_id=guild_id,
             guild=interaction.guild,
+            current_author_id=interaction.user.id,
         )
 
         reply = await llm.generate_response(
@@ -67,7 +69,7 @@ class CommandsCog(commands.Cog):
 
         # Filter emojis
         guild = interaction.guild
-        reply = await emoji_filter.filter_response(reply, guild)
+        reply = await emoji_filter.filter_response(reply, guild, allow_links=requests_links(question))
 
         if len(reply) > 2000:
             reply = reply[:1997] + "..."
@@ -283,6 +285,16 @@ class CommandsCog(commands.Cog):
     async def restart_memory(
         self, interaction: discord.Interaction
     ) -> None:
+        await self._reset_recent_memory(interaction)
+
+    @app_commands.command(
+        name="reset-memory",
+        description="[Owner only] Clear this channel's recent memory, keeping member profiles.",
+    )
+    async def reset_memory(self, interaction: discord.Interaction) -> None:
+        await self._reset_recent_memory(interaction)
+
+    async def _reset_recent_memory(self, interaction: discord.Interaction) -> None:
         if interaction.user.id != config.OWNER_ID:
             await interaction.response.send_message(
                 "I beg your pardon, but only the Young Master may order a memory wipe.",
@@ -291,9 +303,10 @@ class CommandsCog(commands.Cog):
             return
             
         await interaction.response.defer(ephemeral=True, thinking=True)
-        await db.clear_channel_memory(interaction.channel_id)  # type: ignore[arg-type]
+        async with memory.channel_lock(interaction.channel_id):  # type: ignore[arg-type]
+            await db.clear_channel_memory(interaction.channel_id)  # type: ignore[arg-type]
         await interaction.followup.send(
-            "My mind is refreshed for this channel, M'Lord. Shall we begin anew?",
+            "Recent memory cleared for this channel. Member profiles and standing instructions remain.",
             ephemeral=True,
         )
 

@@ -22,10 +22,6 @@ class MediaResult:
     source_url: str = ""
     attribution: str = ""
 
-    @property
-    def discord_content(self) -> str:
-        return f"{self.url}\n{self.attribution}" if self.attribution else self.url
-
 
 SAFE_ACTION_QUERIES = {
     "punch": "funny cartoon punch gif",
@@ -34,8 +30,8 @@ SAFE_ACTION_QUERIES = {
     "hug": "wholesome hug gif",
     "glare": "dramatic glare gif",
     "stare": "dramatic stare gif",
-    "tea": "pouring tea gif",
-    "coffee": "coffee reaction gif",
+    "tea": "tea serving",
+    "coffee": "coffee serving",
 }
 
 
@@ -77,6 +73,7 @@ async def fetch_gif(query: str) -> MediaResult | None:
             raise RuntimeError("Could not connect to GIPHY") from None
         results = data.get("data", [])
         if not results:
+            log.info("GIPHY returned no results for query %r", params["q"])
             return None
         item = results[0]
         images = item.get("images", {})
@@ -131,12 +128,8 @@ async def fetch_image(query: str) -> MediaResult | None:
 
 
 async def fetch_tea_or_coffee(kind: str) -> MediaResult | None:
-    """Fetch a tea or coffee image/GIF depending on available providers."""
-    query = "elegant cup of tea" if kind == "tea" else "beautiful cup of coffee"
-    gif = await fetch_gif(f"{query} cozy")
-    if gif:
-        return gif
-    return await fetch_image(query)
+    """Fetch the first serving GIF rather than substituting a still image."""
+    return await fetch_gif(SAFE_ACTION_QUERIES[kind])
 
 
 async def fetch_action_gif(action: str) -> MediaResult | None:

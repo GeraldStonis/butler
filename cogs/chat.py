@@ -16,8 +16,20 @@ from discord.ext import commands
 
 import config
 from services import actions, database as db, emoji_filter, intent, llm, memory
+from services.response_text import requests_links
 
 log = logging.getLogger("nixi.chat")
+
+
+def is_wellbeing_question(content: str) -> bool:
+    text = re.sub(r"<@!?\d+>|\b(?:nixi|nixon|butler)\b", "", content, flags=re.I)
+    text = re.sub(r"[^a-z\s']", " ", text.lower())
+    text = re.sub(r"\s+", " ", text).strip()
+    return bool(re.fullmatch(
+        r"(?:(?:hey|hi|hello|yo) )?(?:how (?:are you|are u|r you|r u|you doing|are you doing)|"
+        r"how's it going|hows it going|how do you do|you good|u good)(?: today| doing| bro)?",
+        text,
+    ))
 
 
 class ChatCog(commands.Cog):
@@ -32,6 +44,10 @@ class ChatCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
+        async with memory.channel_lock(message.channel.id):
+            await self._handle_message(message)
+
+    async def _handle_message(self, message: discord.Message) -> None:
         if self.bot.user and message.author.id == self.bot.user.id:
             return
 
@@ -50,6 +66,9 @@ class ChatCog(commands.Cog):
         if message.author.bot:
             return
 
+        if guild_id is not None:
+            await db.update_member_profile(guild_id, message.author.id, message.author.display_name, message.author.name)
+
         await db.record_user_activity(
             guild_id=guild_id,
             channel_id=message.channel.id,
@@ -58,6 +77,15 @@ class ChatCog(commands.Cog):
         )
 
         mode = await self._detect_mode(message)
+        if mode is not None or memory.has_member_fact_candidate(content):
+            asyncio.create_task(memory.extract_and_store_memories(
+                channel_id=message.channel.id,
+                user_message=content,
+                user_name=message.author.display_name,
+                bot_reply="",
+                guild_id=guild_id,
+                user_id=message.author.id,
+            ))
         if mode is None:
             return
 
@@ -68,6 +96,18 @@ class ChatCog(commands.Cog):
             getattr(message.channel, "name", "DM"),
             content,
         )
+
+        if mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"} and is_wellbeing_question(content):
+            await message.reply("Missed me?", mention_author=False)
+            await memory.log_message(
+                channel_id=message.channel.id,
+                guild_id=guild_id,
+                author_id=self.bot.user.id,
+                author_name="Nixi",
+                content="Missed me?",
+                is_bot=True,
+            )
+            return
 
         async with message.channel.typing():
             if (
@@ -90,10 +130,13 @@ class ChatCog(commands.Cog):
                 mode=mode,
                 guild_id=guild_id,
                 guild=message.guild,
+                current_author_id=message.author.id,
             )
 
             reply_text = await llm.generate_response(context)
-            reply_text = await emoji_filter.filter_response(reply_text, message.guild)
+            reply_text = await emoji_filter.filter_response(
+                reply_text, message.guild, allow_links=requests_links(content)
+            )
 
             if len(reply_text) > 2000:
                 reply_text = reply_text[:1997] + "..."
@@ -115,20 +158,18 @@ class ChatCog(commands.Cog):
             is_bot=True,
         )
 
-        asyncio.create_task(
-            memory.extract_and_store_memories(
-                channel_id=message.channel.id,
-                user_message=content,
-                user_name=message.author.display_name,
-                bot_reply=reply_text,
-            )
-        )
-
     async def _detect_mode(self, message: discord.Message) -> str | None:
         """Determine why Nixi should speak, or return None for silence."""
         content_lower = (message.content or "").lower()
 
         if isinstance(message.channel, discord.DMChannel):
+            return "DIRECT_ADDRESS"
+
+        if (
+            config.ENABLE_NATURAL_OWNER_ACTIONS
+            and message.author.id == config.OWNER_ID
+            and intent.heuristic_intent(message.content, list(message.mentions)) is not None
+        ):
             return "DIRECT_ADDRESS"
 
         if self.bot.user in message.mentions:  # type: ignore[operator]

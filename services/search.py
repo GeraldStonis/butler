@@ -10,6 +10,7 @@ import httpx
 
 import config
 from services import llm
+from services.response_text import filter_links
 
 log = logging.getLogger("nixi.search")
 
@@ -145,15 +146,15 @@ async def image_search(query: str, count: int = 6) -> list[SearchItem]:
     return items
 
 
-async def summarize_results(query: str, results: list[SearchItem], mode: str = "search") -> str:
-    """Create a short Nixi-style summary with source links."""
+async def summarize_results(query: str, results: list[SearchItem], mode: str = "search", *, include_links: bool = False) -> str:
+    """Create a short summary; visible sources are opt-in."""
     if not (config.TAVILY_API_KEY or config.BRAVE_SEARCH_API_KEY):
         return (
             "I can search the web once TAVILY_API_KEY is configured. "
             "At present, my opera glasses are decorative."
         )
     if not results:
-        return f"I searched for '{query}', but found nothing worth presenting."
+        return filter_links(f"I searched for '{query}', but found nothing worth presenting.", include_links)
 
     source_block = "\n".join(
         f"{idx + 1}. {item.title}\nURL: {item.url}\nSummary: {item.description}"
@@ -165,7 +166,9 @@ async def summarize_results(query: str, results: list[SearchItem], mode: str = "
             "role": "system",
             "content": (
                 "Summarize these search results for Discord. Be concise, factual, "
-                "and useful. Include 3-6 bullets and keep the source URLs. Use "
+                "and useful. Answer the question directly; use bullets only when helpful. "
+                + ("Include source links. " if include_links else "Do not include URLs, hyperlinks, or citations. ")
+                + "Use "
                 "only light butler wit; clarity comes first."
             ),
         },
@@ -174,7 +177,8 @@ async def summarize_results(query: str, results: list[SearchItem], mode: str = "
             "content": f"Mode: {mode}\nQuery: {query}\n\nResults:\n{source_block}",
         },
     ]
-    return await llm.generate_response(prompt, temperature=0.35, max_tokens=500)
+    reply = await llm.generate_response(prompt, temperature=0.35, max_tokens=500)
+    return filter_links(reply, include_links)
 
 
 def unsplash_source_url(query: str) -> str:

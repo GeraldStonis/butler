@@ -33,8 +33,11 @@ class HousekeepingCog(commands.Cog):
 
     @tasks.loop(seconds=60)
     async def housekeeping_loop(self) -> None:
-        await self._maybe_send_morning_news()
-        await self._maybe_nudge_dead_chat()
+        for task in (self._maybe_send_morning_news, self._maybe_nudge_dead_chat):
+            try:
+                await task()
+            except Exception:
+                log.exception("Scheduled task failed: %s", task.__name__)
 
     @housekeeping_loop.before_loop
     async def before_housekeeping(self) -> None:
@@ -66,11 +69,13 @@ class HousekeepingCog(commands.Cog):
 
         try:
             hour, minute = [int(part) for part in config.MORNING_NEWS_TIME.split(":", 1)]
+            if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                raise ValueError("Invalid time")
         except ValueError:
             log.warning("Invalid MORNING_NEWS_TIME: %s", config.MORNING_NEWS_TIME)
             return
 
-        if now.hour != hour or now.minute != minute:
+        if (now.hour, now.minute) < (hour, minute):
             return
 
         channel = self.bot.get_channel(config.MORNING_NEWS_CHANNEL_ID)
@@ -128,7 +133,7 @@ class HousekeepingCog(commands.Cog):
             log.warning("Sticker spam channel not found: %d", config.STICKER_SPAM_CHANNEL_ID)
             return
 
-        stickers = list(channel.guild.stickers)
+        stickers = [sticker for sticker in channel.guild.stickers if sticker.available]
         if not stickers:
             log.warning("Guild %s has no stickers to spam", channel.guild.name)
             return

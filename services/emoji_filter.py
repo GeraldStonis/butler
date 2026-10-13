@@ -7,6 +7,7 @@ import re
 from typing import TYPE_CHECKING
 
 import discord
+from services.response_text import filter_links
 
 if TYPE_CHECKING:
     from discord.ext.commands import Bot
@@ -49,7 +50,7 @@ def _get_guild_emoji_ids(guild: discord.Guild) -> set[int]:
     return {e.id for e in guild.emojis}
 
 
-async def filter_response(text: str, guild: discord.Guild | None) -> str:
+async def filter_response(text: str, guild: discord.Guild | None, *, allow_links: bool = False) -> str:
     """
     Post-process an LLM response.
 
@@ -57,6 +58,7 @@ async def filter_response(text: str, guild: discord.Guild | None) -> str:
     - Replace :emoji_name: with Discord's <a:name:id> custom emoji format.
     - Strip hallucinated custom emoji IDs.
     """
+    text = filter_links(text, allow_links)
     if guild:
         sorted_members = sorted(guild.members, key=lambda m: len(m.display_name), reverse=True)
         for member in sorted_members:

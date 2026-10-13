@@ -7,16 +7,25 @@ import logging
 import discord
 
 import config
-from services import intent, media, search
+from services import intent, media, search, memory
+from services.response_text import filter_links, requests_links
 
 log = logging.getLogger("nixi.actions")
 
 
-async def build_news_briefing(topic: str | None = None) -> str:
+def _media_embed(result: media.MediaResult) -> discord.Embed:
+    embed = discord.Embed()
+    embed.set_image(url=result.url)
+    if result.attribution:
+        embed.set_footer(text=result.attribution)
+    return embed
+
+
+async def build_news_briefing(topic: str | None = None, *, include_links: bool = False) -> str:
     """Fetch and summarize a compact news briefing."""
     query = topic or ", ".join(config.MORNING_NEWS_TOPICS)
     results = await search.news_search(query, count=8)
-    return await search.summarize_results(query, results, mode="news")
+    return await search.summarize_results(query, results, mode="news", include_links=include_links)
 
 
 async def execute_owner_intent(
@@ -37,14 +46,14 @@ async def execute_owner_intent(
             query = owner_intent.query or message.content
             results = await search.web_search(query, count=6)
             await message.reply(
-                await search.summarize_results(query, results),
+                await search.summarize_results(query, results, include_links=requests_links(message.content)),
                 mention_author=False,
             )
             return True
 
         if name == "news":
             await message.reply(
-                await build_news_briefing(owner_intent.query or None),
+                await build_news_briefing(owner_intent.query or None, include_links=requests_links(message.content)),
                 mention_author=False,
             )
             return True
@@ -55,7 +64,7 @@ async def execute_owner_intent(
             if not result:
                 await message.reply("I found no image fit for the household gallery.", mention_author=False)
                 return True
-            await message.reply(f"Presented for inspection: {result.url}", mention_author=False)
+            await message.reply(embed=_media_embed(result), mention_author=False)
             return True
 
         if name == "gif_search":
@@ -63,11 +72,11 @@ async def execute_owner_intent(
             result = await media.fetch_gif(query)
             if not result:
                 await message.reply(
-                    "I could not find a GIF for that request. My dramatic mime will have to wait.",
+                    f"GIPHY returned no GIFs for '{filter_links(query)}'. Try a simpler search.",
                     mention_author=False,
                 )
                 return True
-            await message.reply(result.discord_content, mention_author=False)
+            await message.reply(embed=_media_embed(result), mention_author=False)
             return True
 
         if name == "meme":
@@ -75,16 +84,24 @@ async def execute_owner_intent(
             if not result:
                 await message.reply("The meme tray returned empty, a tragedy in three acts.", mention_author=False)
                 return True
-            await message.reply(f"{result.title}\n{result.url}", mention_author=False)
+            sent = await message.reply(filter_links(result.title[:2000], requests_links(message.content)) or None, embed=_media_embed(result), mention_author=False)
+            await memory.log_message(
+                channel_id=message.channel.id,
+                guild_id=message.guild.id if message.guild else None,
+                author_id=sent.author.id,
+                author_name="Nixi",
+                content=f"[Meme delivered as a Discord image embed: {result.title[:500]}]",
+                is_bot=True,
+            )
             return True
 
         if name in {"tea", "coffee"}:
             result = await media.fetch_tea_or_coffee(name)
             if not result:
-                await message.reply(f"I could not procure {name}. The pantry is in disgrace.", mention_author=False)
+                await message.reply(f"GIPHY returned no {name}-serving GIFs. Try me again in a moment.", mention_author=False)
                 return True
             label = "Tea service" if name == "tea" else "Coffee service"
-            await message.reply(f"{label}, as requested.\n{result.discord_content}", mention_author=False)
+            await message.reply(f"{label}, as requested.", embed=_media_embed(result), mention_author=False)
             return True
 
         if name == "action_gif":
@@ -97,7 +114,8 @@ async def execute_owner_intent(
                 )
                 return True
             await message.channel.send(
-                f"{target}, the Young Master has requested a little slapstick diplomacy.\n{result.discord_content}"
+                f"{target}, the Young Master has requested a little slapstick diplomacy.",
+                embed=_media_embed(result),
             )
             return True
 
