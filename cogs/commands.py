@@ -28,6 +28,15 @@ class CommandsCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
+    async def _require_owner(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == config.OWNER_ID:
+            return True
+        await interaction.response.send_message(
+            "Household operations are reserved for the Young Master. You may still address me in chat, of course.",
+            ephemeral=True,
+        )
+        return False
+
     # ── /ask ─────────────────────────────────────────────────────────────
 
     @app_commands.command(
@@ -38,6 +47,8 @@ class CommandsCog(commands.Cog):
     async def ask(
         self, interaction: discord.Interaction, question: str
     ) -> None:
+        if not await self._require_owner(interaction):
+            return
         await interaction.response.defer(thinking=True)
 
         guild_id = interaction.guild.id if interaction.guild else None
@@ -87,6 +98,8 @@ class CommandsCog(commands.Cog):
         description="Nixi introduces himself.",
     )
     async def info_yourself(self, interaction: discord.Interaction) -> None:
+        if not await self._require_owner(interaction):
+            return
         await interaction.response.defer(thinking=True)
 
         persona = config.load_persona()
@@ -122,6 +135,8 @@ class CommandsCog(commands.Cog):
         description="Ask Nixi about his employer (he'll be discreet).",
     )
     async def info_boss(self, interaction: discord.Interaction) -> None:
+        if not await self._require_owner(interaction):
+            return
         await interaction.response.defer(thinking=True)
 
         persona = config.load_persona()

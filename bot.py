@@ -25,6 +25,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 log = logging.getLogger("nixi")
+_cogs_loaded = False
 
 
 # ── Bot Setup ────────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ bot = commands.Bot(
 @bot.event
 async def on_ready() -> None:
     """Fires once when the bot has connected and is ready."""
+    global _cogs_loaded
     assert bot.user is not None
     log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     log.info("Nixi is at your service.")
@@ -61,13 +63,15 @@ async def on_ready() -> None:
     log.info("Emoji ownership cache updated")
 
     # Load cogs
-    cog_names = ["cogs.chat", "cogs.commands", "cogs.watcher"]
-    for cog in cog_names:
-        try:
-            await bot.load_extension(cog)
-            log.info("Loaded cog: %s", cog)
-        except Exception:
-            log.exception("Failed to load cog: %s", cog)
+    if not _cogs_loaded:
+        cog_names = ["cogs.chat", "cogs.commands", "cogs.watcher", "cogs.housekeeping"]
+        for cog in cog_names:
+            try:
+                await bot.load_extension(cog)
+                log.info("Loaded cog: %s", cog)
+            except Exception:
+                log.exception("Failed to load cog: %s", cog)
+        _cogs_loaded = True
 
     log.info(
         "Serving in %d guild(s). Awaiting orders.",

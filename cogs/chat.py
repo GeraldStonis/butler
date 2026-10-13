@@ -1,52 +1,43 @@
 """
-Chat Cog — Core conversation handler for Nixi.
+Core conversation handler for Nixi.
 
-Listens to on_message and decides whether to respond based on triggers:
-- Bot @-mentioned → DIRECT_ADDRESS
-- Reply to bot's message → REPLY_CHAIN
-- DM → DIRECT_ADDRESS
-- Boss name mentioned → BOSS_MENTIONED
-- Otherwise → log only, do not respond
+Public users can chat with Nixi when they address him. Owner-only natural
+language actions are routed here before normal LLM conversation.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import re
+
 import discord
 from discord.ext import commands
 
 import config
-from services import llm, memory, emoji_filter
+from services import actions, database as db, emoji_filter, intent, llm, memory
 
 log = logging.getLogger("nixi.chat")
 
 
 class ChatCog(commands.Cog):
-    """Handles all organic conversation triggers."""
+    """Handles organic conversation triggers and owner action routing."""
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        # Pre-compile boss name patterns (case-insensitive)
         self._boss_patterns: list[str] = [
-            name.lower() for name in config.OWNER_NAMES
+            name.lower() for name in config.OWNER_ALIASES
         ]
-        # Additional trigger words
-        self._trigger_words: list[str] = ["butler", "servant", "nixi"]
+        self._trigger_words: list[str] = ["butler", "servant", "nixi", "nixon"]
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
-        # Never respond to ourselves
-        if message.author.id == self.bot.user.id:  # type: ignore[union-attr]
+        if self.bot.user and message.author.id == self.bot.user.id:
             return
 
-        # Determine the display content (embeds have no .content sometimes)
         content = message.content or ""
-
-        # Log every message we can see (for context building),
-        # but only non-bot messages or messages from tracked bots
-        # (watcher cog handles bot messages separately for alerts)
         guild_id = message.guild.id if message.guild else None
+
         await memory.log_message(
             channel_id=message.channel.id,
             guild_id=guild_id,
@@ -56,15 +47,19 @@ class ChatCog(commands.Cog):
             is_bot=message.author.bot,
         )
 
-        # Don't generate responses to other bots
-        # (watcher cog handles bot alert logic)
         if message.author.bot:
             return
 
-        # ── Determine trigger & mode ────────────────────────────────────
-        mode = self._detect_mode(message)
+        await db.record_user_activity(
+            guild_id=guild_id,
+            channel_id=message.channel.id,
+            user_id=message.author.id,
+            display_name=message.author.display_name,
+        )
+
+        mode = await self._detect_mode(message)
         if mode is None:
-            return  # Not a trigger message; we logged it, that's enough
+            return
 
         log.info(
             "Triggered [%s] by %s in #%s: %.80s",
@@ -74,9 +69,20 @@ class ChatCog(commands.Cog):
             content,
         )
 
-        # Show typing indicator while we think
         async with message.channel.typing():
-            # Build context and generate response
+            if (
+                config.ENABLE_NATURAL_OWNER_ACTIONS
+                and message.author.id == config.OWNER_ID
+                and mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"}
+            ):
+                owner_intent = await intent.classify_owner_intent(
+                    content,
+                    mentions=list(message.mentions),
+                )
+                handled = await actions.execute_owner_intent(message, owner_intent)
+                if handled:
+                    return
+
             context = await memory.build_context(
                 channel_id=message.channel.id,
                 current_message=content,
@@ -87,22 +93,19 @@ class ChatCog(commands.Cog):
             )
 
             reply_text = await llm.generate_response(context)
+            reply_text = await emoji_filter.filter_response(reply_text, message.guild)
 
-            # Filter emojis
-            guild = message.guild
-            reply_text = await emoji_filter.filter_response(reply_text, guild)
-
-            # Ensure we don't exceed Discord's 2000-char limit
             if len(reply_text) > 2000:
                 reply_text = reply_text[:1997] + "..."
 
-        # Send the reply
         if not reply_text:
             return
 
-        sent = await message.reply(reply_text, mention_author=False)
+        await message.reply(reply_text, mention_author=False)
 
-        # Log our own reply
+        if mode == "OWNER_UNAVAILABLE":
+            await self._notify_owner(message)
+
         await memory.log_message(
             channel_id=message.channel.id,
             guild_id=guild_id,
@@ -112,7 +115,6 @@ class ChatCog(commands.Cog):
             is_bot=True,
         )
 
-        # Background: extract any long-term memories from this exchange
         asyncio.create_task(
             memory.extract_and_store_memories(
                 channel_id=message.channel.id,
@@ -122,61 +124,57 @@ class ChatCog(commands.Cog):
             )
         )
 
-    def _detect_mode(self, message: discord.Message) -> str | None:
-        """
-        Determine the conversation mode based on the message context.
-
-        Returns the mode string, or None if the bot should not respond.
-        """
+    async def _detect_mode(self, message: discord.Message) -> str | None:
+        """Determine why Nixi should speak, or return None for silence."""
         content_lower = (message.content or "").lower()
 
-        # DMs always get a response
         if isinstance(message.channel, discord.DMChannel):
             return "DIRECT_ADDRESS"
 
-        # Bot is @-mentioned
         if self.bot.user in message.mentions:  # type: ignore[operator]
             return "DIRECT_ADDRESS"
 
-        # Message is a reply to one of the bot's own messages
         if message.reference and message.reference.message_id:
-            # Check if the referenced message was sent by us
-            # We use the cached message if available
             ref = message.reference.resolved
-            if isinstance(ref, discord.Message):
-                if ref.author.id == self.bot.user.id:  # type: ignore[union-attr]
+            if isinstance(ref, discord.Message) and self.bot.user:
+                if ref.author.id == self.bot.user.id:
                     return "REPLY_CHAIN"
-            else:
-                # If not cached, we can't easily check without an API call.
-                # We'll try to fetch it.
-                return self._check_reply_sync(message)
 
-        # Boss name mentioned in the message
-        for name in self._boss_patterns:
-            if name in content_lower:
-                return "BOSS_MENTIONED"
+        if message.author.id != config.OWNER_ID and self._mentions_owner(message):
+            guild_id = message.guild.id if message.guild else None
+            idle = await db.get_user_idle_seconds(guild_id, config.OWNER_ID)
+            if idle is None or idle >= config.OWNER_AWAY_AFTER_SECONDS:
+                return "OWNER_UNAVAILABLE"
 
-        import re
         for word in self._trigger_words:
-            if re.search(r'\b' + re.escape(word) + r'\b', content_lower):
+            if re.search(r"\b" + re.escape(word) + r"\b", content_lower):
                 return "DIRECT_ADDRESS"
 
         return None
 
-    def _check_reply_sync(self, message: discord.Message) -> str | None:
-        """
-        Fallback check for reply chains when the referenced message
-        isn't cached. Returns mode or None.
+    def _mentions_owner(self, message: discord.Message) -> bool:
+        if any(user.id == config.OWNER_ID for user in message.mentions):
+            return True
 
-        Since we can't await here, we check the reference resolved field.
-        If it's a DeletedReferencedMessage or None, we skip.
-        """
-        # If the reference couldn't be resolved, check boss names as fallback
         content_lower = (message.content or "").lower()
         for name in self._boss_patterns:
-            if name in content_lower:
-                return "BOSS_MENTIONED"
-        return None
+            if re.search(r"\b" + re.escape(name) + r"\b", content_lower):
+                return True
+        return False
+
+    async def _notify_owner(self, message: discord.Message) -> None:
+        """DM the owner when someone was looking for them."""
+        try:
+            owner = await self.bot.fetch_user(config.OWNER_ID)
+            location = "DM"
+            if message.guild and hasattr(message.channel, "mention"):
+                location = f"{message.guild.name} / {message.channel.mention}"
+            await owner.send(
+                f"{message.author.display_name} mentioned you in {location}:\n"
+                f"> {(message.content or '[no text]')[:500]}"
+            )
+        except Exception:
+            log.exception("Failed to notify owner about mention")
 
 
 async def setup(bot: commands.Bot) -> None:

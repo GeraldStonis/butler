@@ -87,6 +87,32 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             uploader_id INTEGER NOT NULL,
             cached_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS user_activity (
+            guild_id         INTEGER NOT NULL,
+            user_id          INTEGER NOT NULL,
+            channel_id       INTEGER NOT NULL,
+            display_name     TEXT    NOT NULL,
+            last_message_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (guild_id, user_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_user_activity_guild_time
+            ON user_activity (guild_id, last_message_at);
+
+        CREATE TABLE IF NOT EXISTS channel_activity (
+            channel_id       INTEGER PRIMARY KEY,
+            guild_id         INTEGER,
+            last_user_id     INTEGER,
+            last_message_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_dead_ping_at TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS bot_state (
+            key        TEXT PRIMARY KEY,
+            value      TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     await db.commit()
 
@@ -108,6 +134,124 @@ async def save_message(
            (channel_id, guild_id, author_id, author_name, is_bot, content)
            VALUES (?, ?, ?, ?, ?, ?)""",
         (channel_id, guild_id, author_id, author_name, int(is_bot), content),
+    )
+    await db.commit()
+
+
+async def record_user_activity(
+    guild_id: int | None,
+    channel_id: int,
+    user_id: int,
+    display_name: str,
+) -> None:
+    """Record the most recent non-bot activity for a user and channel."""
+    if guild_id is None:
+        return
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO user_activity
+           (guild_id, user_id, channel_id, display_name, last_message_at)
+           VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(guild_id, user_id) DO UPDATE SET
+               channel_id = excluded.channel_id,
+               display_name = excluded.display_name,
+               last_message_at = CURRENT_TIMESTAMP""",
+        (guild_id, user_id, channel_id, display_name),
+    )
+    await db.execute(
+        """INSERT INTO channel_activity
+           (channel_id, guild_id, last_user_id, last_message_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(channel_id) DO UPDATE SET
+               guild_id = excluded.guild_id,
+               last_user_id = excluded.last_user_id,
+               last_message_at = CURRENT_TIMESTAMP""",
+        (channel_id, guild_id, user_id),
+    )
+    await db.commit()
+
+
+async def get_user_idle_seconds(guild_id: int | None, user_id: int) -> float | None:
+    """Return seconds since a user's last non-bot message in this guild."""
+    if guild_id is None:
+        return None
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT (julianday('now') - julianday(last_message_at)) * 86400.0 AS idle
+           FROM user_activity
+           WHERE guild_id = ? AND user_id = ?""",
+        (guild_id, user_id),
+    )
+    row = await cursor.fetchone()
+    return float(row["idle"]) if row and row["idle"] is not None else None
+
+
+async def get_channel_idle_candidates(
+    channel_ids: list[int] | None = None,
+) -> list[dict]:
+    """Return channel activity rows for dead-chat checks."""
+    db = await get_db()
+    if channel_ids:
+        placeholders = ",".join("?" for _ in channel_ids)
+        cursor = await db.execute(
+            f"""SELECT channel_id, guild_id, last_user_id, last_message_at,
+                       last_dead_ping_at,
+                       (julianday('now') - julianday(last_message_at)) * 86400.0 AS idle_seconds,
+                       CASE
+                           WHEN last_dead_ping_at IS NULL THEN NULL
+                           ELSE (julianday('now') - julianday(last_dead_ping_at)) * 86400.0
+                       END AS cooldown_seconds
+                FROM channel_activity
+                WHERE channel_id IN ({placeholders})""",
+            channel_ids,
+        )
+    else:
+        cursor = await db.execute(
+            """SELECT channel_id, guild_id, last_user_id, last_message_at,
+                      last_dead_ping_at,
+                      (julianday('now') - julianday(last_message_at)) * 86400.0 AS idle_seconds,
+                      CASE
+                          WHEN last_dead_ping_at IS NULL THEN NULL
+                          ELSE (julianday('now') - julianday(last_dead_ping_at)) * 86400.0
+                      END AS cooldown_seconds
+               FROM channel_activity"""
+        )
+    rows = await cursor.fetchall()
+    return [dict(row) for row in rows]
+
+
+async def mark_dead_chat_ping(channel_id: int) -> None:
+    """Record that Nixi sent a dead-chat nudge in this channel."""
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO channel_activity
+           (channel_id, last_dead_ping_at)
+           VALUES (?, CURRENT_TIMESTAMP)
+           ON CONFLICT(channel_id) DO UPDATE SET
+               last_dead_ping_at = CURRENT_TIMESTAMP""",
+        (channel_id,),
+    )
+    await db.commit()
+
+
+async def get_state(key: str) -> str | None:
+    """Fetch a small persistent bot state value."""
+    db = await get_db()
+    cursor = await db.execute("SELECT value FROM bot_state WHERE key = ?", (key,))
+    row = await cursor.fetchone()
+    return row["value"] if row else None
+
+
+async def set_state(key: str, value: str) -> None:
+    """Set a small persistent bot state value."""
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO bot_state (key, value, updated_at)
+           VALUES (?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(key) DO UPDATE SET
+               value = excluded.value,
+               updated_at = CURRENT_TIMESTAMP""",
+        (key, value),
     )
     await db.commit()
 

@@ -1,45 +1,97 @@
 """
-Nixi Bot Configuration
-All tunables loaded from environment variables with sensible defaults.
+Nixi Bot Configuration.
+
+All tunables are loaded from environment variables with sensible defaults.
 """
+
+from __future__ import annotations
 
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ── Discord ──────────────────────────────────────────────────────────────────
+
+def _bool_env(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _list_env(name: str, default: str = "") -> list[str]:
+    return [
+        item.strip()
+        for item in os.environ.get(name, default).split(",")
+        if item.strip()
+    ]
+
+
+def _int_list_env(name: str, default: str = "") -> list[int]:
+    values: list[int] = []
+    for item in _list_env(name, default):
+        try:
+            values.append(int(item))
+        except ValueError:
+            continue
+    return values
+
+
+# Discord
 DISCORD_TOKEN: str = os.environ["DISCORD_TOKEN"]
 OWNER_ID: int = int(os.environ.get("OWNER_ID", "0"))
 
-# Aliases the bot recognises as referring to the boss (case-insensitive match)
-OWNER_NAMES: list[str] = [
-    n.strip()
-    for n in os.environ.get(
-        "OWNER_NAMES", "Icosahedronixon,Icosahedronix,Icosa,Pokemon"
-    ).split(",")
-    if n.strip()
-]
+OWNER_ALIASES: list[str] = _list_env(
+    "OWNER_ALIASES",
+    "ronix,roni,ronyx,ronnie,icosa,icosahedron,icosahedronix,icosahedronixon",
+)
+# Backward-compatible name used by older code.
+OWNER_NAMES: list[str] = OWNER_ALIASES
+OWNER_AWAY_AFTER_SECONDS: int = int(os.environ.get("OWNER_AWAY_AFTER_SECONDS", "300"))
+ENABLE_NATURAL_OWNER_ACTIONS: bool = _bool_env("ENABLE_NATURAL_OWNER_ACTIONS", True)
 
-# ── LLM (Ollama Cloud) ──────────────────────────────────────────────────────
+# LLM (Ollama Cloud)
 OLLAMA_HOST: str = os.environ.get("OLLAMA_HOST", "https://ollama.com")
 OLLAMA_API_KEY: str = os.environ.get("OLLAMA_API_KEY", "")
 OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "gpt-oss:120b")
 
-# ── Database ─────────────────────────────────────────────────────────────────
+# Database
 DB_PATH: str = os.environ.get("DB_PATH", "nixi.db")
 
-# ── Memory tuning ───────────────────────────────────────────────────────────
+# Memory tuning
 CONTEXT_WINDOW_SIZE: int = int(os.environ.get("CONTEXT_WINDOW_SIZE", "100"))
 SUMMARY_THRESHOLD: int = int(os.environ.get("SUMMARY_THRESHOLD", "50"))
 
-# ── Persona ──────────────────────────────────────────────────────────────────
+# Owner-only web/media tools
+BRAVE_SEARCH_API_KEY: str = os.environ.get("BRAVE_SEARCH_API_KEY", "")
+TENOR_API_KEY: str = os.environ.get("TENOR_API_KEY", "")
+MEDIA_SAFE_MODE: bool = _bool_env("MEDIA_SAFE_MODE", True)
+
+# Morning news
+MORNING_NEWS_ENABLED: bool = _bool_env("MORNING_NEWS_ENABLED", False)
+MORNING_NEWS_CHANNEL_ID: int = int(os.environ.get("MORNING_NEWS_CHANNEL_ID", "0") or "0")
+MORNING_NEWS_TIME: str = os.environ.get("MORNING_NEWS_TIME", "08:00")
+MORNING_NEWS_TIMEZONE: str = os.environ.get("MORNING_NEWS_TIMEZONE", "Asia/Kolkata")
+MORNING_NEWS_TOPICS: list[str] = _list_env(
+    "MORNING_NEWS_TOPICS", "world,india,technology,cybersecurity"
+)
+
+# Dead chat nudges
+DEAD_CHAT_ENABLED: bool = _bool_env("DEAD_CHAT_ENABLED", False)
+DEAD_CHAT_IDLE_SECONDS: int = int(os.environ.get("DEAD_CHAT_IDLE_SECONDS", "300"))
+DEAD_CHAT_COOLDOWN_SECONDS: int = int(os.environ.get("DEAD_CHAT_COOLDOWN_SECONDS", "3600"))
+DEAD_CHAT_CHANNEL_IDS: list[int] = _int_list_env("DEAD_CHAT_CHANNEL_IDS")
+
+# Persona
 PERSONA_PATH: Path = Path(__file__).parent / "persona.md"
+
 
 def load_persona() -> str:
     """Read the full persona system prompt from persona.md."""
     return PERSONA_PATH.read_text(encoding="utf-8")
 
-# ── Bot-watching rules ───────────────────────────────────────────────────────
+
+# Bot-watching rules
 BOT_RULES_PATH: Path = Path(__file__).parent / "bot_rules.json"
