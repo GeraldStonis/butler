@@ -41,6 +41,8 @@ async def fetch_meme() -> MediaResult | None:
         response = await client.get("https://meme-api.com/gimme")
         response.raise_for_status()
         data = response.json()
+    if config.MEDIA_SAFE_MODE and (data.get("nsfw") or data.get("spoiler")):
+        return None
     url = data.get("url") or data.get("preview", [None])[-1]
     if not url:
         return None

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -11,9 +12,24 @@ import discord
 from discord.ext import commands, tasks
 
 import config
-from services import actions, database as db, memory
+from services import actions, database as db, memory, media
 
 log = logging.getLogger("nixi.housekeeping")
+
+DEAD_CHAT_LINES = (
+    "ded chat. {member}, all that aura and not one conversation. Say something.",
+    "ded chat. {member}, the typing indicator has more personality today. Defend your reputation.",
+    "ded chat. {member}, lurking is not a competitive sport. Drop a take.",
+    "ded chat. {member}, bro joined the server just to become furniture. Start a conversation.",
+    "ded chat. {member}, your yap license is collecting dust. Put it to work.",
+    "ded chat. {member}, surely you have one opinion worse than this silence. Let's hear it.",
+    "ded chat. {member}, the chat is buffering and you're apparently the connection. Fix it.",
+    "ded chat. {member}, premium lurker, free-trial conversationalist. Give us a topic.",
+    "ded chat. {member}, imagine getting out-yapped by a butler. Couldn't be you. Prove it.",
+    "ded chat. {member}, everyone suddenly has a life? Suspicious. Start some harmless discourse.",
+    "ded chat. {member}, zero messages, maximum screen time. Make that ratio less embarrassing.",
+    "ded chat. {member}, the group project needs you to contribute one sentence. Begin.",
+)
 
 
 def dead_chat_delay_seconds(row: dict) -> int:
@@ -38,7 +54,7 @@ class HousekeepingCog(commands.Cog):
 
     @tasks.loop(seconds=15)
     async def housekeeping_loop(self) -> None:
-        for task in (self._maybe_send_morning_news, self._maybe_nudge_dead_chat):
+        for task in (self._maybe_send_morning_news, self._maybe_nudge_dead_chat, self._maybe_send_random_meme):
             try:
                 await task()
             except Exception:
@@ -115,10 +131,15 @@ class HousekeepingCog(commands.Cog):
                 member = self._pick_random_member(channel)
                 if not member:
                     continue
+                line_key = f"dead_chat_last_line:{channel.id}"
+                previous = await db.get_state(line_key)
+                template = random.choice([line for line in DEAD_CHAT_LINES if line != previous])
                 await channel.send(
-                    f"ded chat. {member.mention}, kindly administer conversational CPR."
+                    template.format(member=member.mention),
+                    allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True, replied_user=False),
                 )
                 await db.mark_dead_chat_ping(channel.id)
+                await db.set_state(line_key, template)
 
     def _pick_random_member(self, channel: discord.TextChannel) -> discord.Member | None:
         eligible = [
@@ -127,6 +148,37 @@ class HousekeepingCog(commands.Cog):
             if not member.bot and member.id != config.OWNER_ID
         ]
         return random.choice(eligible) if eligible else None
+
+    async def _maybe_send_random_meme(self) -> None:
+        if not config.MEME_DROP_ENABLED or not config.MEME_DROP_CHANNEL_ID:
+            return
+        channel = self.bot.get_channel(config.MEME_DROP_CHANNEL_ID)
+        if not isinstance(channel, discord.TextChannel):
+            log.warning("Meme drop channel not found: %d", config.MEME_DROP_CHANNEL_ID)
+            return
+        state_key = f"meme_drop_next:{channel.id}"
+        stored = await db.get_state(state_key)
+        try:
+            due = float(stored) if stored is not None else None
+        except ValueError:
+            due = None
+        now = time.time()
+        if due is not None and now < due:
+            return
+        # Reserve the next slot before fetching, so failures don't retry every tick.
+        delay = random.uniform(0.8, 1.2) * config.MEME_DROP_INTERVAL_SECONDS
+        await db.set_state(state_key, str(now + delay))
+        if due is None:
+            return
+        result = await media.fetch_meme()
+        if not result:
+            return
+        last_key = f"meme_drop_last:{channel.id}"
+        if await db.get_state(last_key) == result.url:
+            return
+        await channel.send(embed=actions._media_embed(result), allowed_mentions=discord.AllowedMentions.none())
+        await db.set_state(last_key, result.url)
+        await db.record_bot_activity(channel.guild.id, channel.id)
 
     async def _maybe_send_random_sticker(self) -> None:
         if not config.STICKER_SPAM_ENABLED or not config.STICKER_SPAM_CHANNEL_ID:

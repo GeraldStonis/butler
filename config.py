@@ -70,6 +70,9 @@ BRAVE_SEARCH_API_KEY: str = os.environ.get("BRAVE_SEARCH_API_KEY", "")
 TENOR_API_KEY: str = os.environ.get("TENOR_API_KEY", "")
 GIPHY_API_KEY: str = os.environ.get("GIPHY_API_KEY", "")
 MEDIA_SAFE_MODE: bool = _bool_env("MEDIA_SAFE_MODE", True)
+AUTOMATIC_MEDIA_ENABLED: bool = _bool_env("AUTOMATIC_MEDIA_ENABLED", True)
+AUTOMATIC_MEDIA_COOLDOWN_SECONDS: int = max(0, int(os.environ.get("AUTOMATIC_MEDIA_COOLDOWN_SECONDS", "180")))
+AUTOMATIC_MEDIA_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("AUTOMATIC_MEDIA_CHANCE", "0.3"))))
 
 # Morning news
 MORNING_NEWS_ENABLED: bool = _bool_env("MORNING_NEWS_ENABLED", False)
@@ -90,6 +93,11 @@ DEAD_CHAT_CHANNEL_IDS: list[int] = _int_list_env("DEAD_CHAT_CHANNEL_IDS")
 STICKER_SPAM_ENABLED: bool = _bool_env("STICKER_SPAM_ENABLED", False)
 STICKER_SPAM_CHANNEL_ID: int = int(os.environ.get("STICKER_SPAM_CHANNEL_ID", "0") or "0")
 STICKER_SPAM_INTERVAL_SECONDS: int = int(os.environ.get("STICKER_SPAM_INTERVAL_SECONDS", "60"))
+
+# Independent meme drops, using the spam channel unless another is specified.
+MEME_DROP_ENABLED: bool = _bool_env("MEME_DROP_ENABLED", True)
+MEME_DROP_CHANNEL_ID: int = int(os.environ.get("MEME_DROP_CHANNEL_ID") or STICKER_SPAM_CHANNEL_ID)
+MEME_DROP_INTERVAL_SECONDS: int = max(60, int(os.environ.get("MEME_DROP_INTERVAL_SECONDS", "300")))
 
 # Persona
 PERSONA_PATH: Path = Path(__file__).parent / "persona.md"

@@ -38,6 +38,8 @@ async def execute_owner_intent(
     Returns True when an action was handled and normal chat should stop.
     """
     name = owner_intent.name
+    if message.author.id != config.OWNER_ID:
+        return False
     if name == "chat":
         return False
 
