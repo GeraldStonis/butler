@@ -32,6 +32,26 @@ def is_wellbeing_question(content: str) -> bool:
     ))
 
 
+def is_unbecoming_request(content: str) -> bool:
+    text = content.lower()
+    # Discussing a phrase is different from asking Nixi to perform it.
+    if re.search(r"\b(?:explain|define|meaning|what does|what is|why do|how to)\b", text):
+        return False
+    if re.search(r"\b(?:don't|do not|never|stop|avoid)\s+(?:say|saying|repeat|repeating|type|typing)\b", text):
+        return False
+    request = re.search(
+        r"\b(?:say|repeat|type|reply|respond|chant|act like|pretend to be|become)\b(.{0,100})",
+        text,
+    )
+    if not request:
+        return False
+    return bool(re.search(
+        r"\b(?:u[\s_-]*w[\s_-]*u|o[\s_-]*w[\s_-]*o|nya+|meow|"
+        r"catboy|catgirl|baby voice|good (?:boy|girl)|onii[ -]?chan)\b",
+        request.group(1),
+    ))
+
+
 class ChatCog(commands.Cog):
     """Handles organic conversation triggers and owner action routing."""
 
@@ -97,14 +117,20 @@ class ChatCog(commands.Cog):
             content,
         )
 
-        if mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"} and is_wellbeing_question(content):
-            await message.reply("Missed me?", mention_author=False)
+        fixed_reply = None
+        if mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"}:
+            if message.author.id != config.OWNER_ID and is_unbecoming_request(content):
+                fixed_reply = "Shush."
+            elif is_wellbeing_question(content):
+                fixed_reply = "Missed me?"
+        if fixed_reply:
+            await message.reply(fixed_reply, mention_author=False)
             await memory.log_message(
                 channel_id=message.channel.id,
                 guild_id=guild_id,
                 author_id=self.bot.user.id,
                 author_name="Nixi",
-                content="Missed me?",
+                content=fixed_reply,
                 is_bot=True,
             )
             return
