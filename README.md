@@ -105,14 +105,18 @@ MORNING_NEWS_TIMEZONE=Asia/Kolkata
 MORNING_NEWS_TOPICS=world,india,technology,cybersecurity
 
 DEAD_CHAT_ENABLED=false
-DEAD_CHAT_IDLE_SECONDS=300
-DEAD_CHAT_COOLDOWN_SECONDS=3600
+DEAD_CHAT_IDLE_SECONDS=60
 DEAD_CHAT_CHANNEL_IDS=
 
 STICKER_SPAM_ENABLED=false
 STICKER_SPAM_CHANNEL_ID=
 STICKER_SPAM_INTERVAL_SECONDS=60
 ```
+
+Dead-chat waits start at `DEAD_CHAT_IDLE_SECONDS`, then double after each
+unanswered nudge (60, 120, 240 seconds, and so on). Each wait is measured from
+the latest channel message. Any human message resets the sequence. Bot messages
+do not reset it. State survives restarts; the old fixed cooldown setting is ignored.
 
 `DEAD_CHAT_CHANNEL_IDS` may be left empty to consider channels Nixi has seen
 activity in, or set to comma-separated channel IDs.

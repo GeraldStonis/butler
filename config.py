@@ -82,7 +82,7 @@ MORNING_NEWS_TOPICS: list[str] = _list_env(
 
 # Dead chat nudges
 DEAD_CHAT_ENABLED: bool = _bool_env("DEAD_CHAT_ENABLED", False)
-DEAD_CHAT_IDLE_SECONDS: int = int(os.environ.get("DEAD_CHAT_IDLE_SECONDS", "300"))
+DEAD_CHAT_IDLE_SECONDS: int = int(os.environ.get("DEAD_CHAT_IDLE_SECONDS", "60"))
 DEAD_CHAT_COOLDOWN_SECONDS: int = int(os.environ.get("DEAD_CHAT_COOLDOWN_SECONDS", "3600"))
 DEAD_CHAT_CHANNEL_IDS: list[int] = _int_list_env("DEAD_CHAT_CHANNEL_IDS")
 

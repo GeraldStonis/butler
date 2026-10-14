@@ -11,9 +11,14 @@ import discord
 from discord.ext import commands, tasks
 
 import config
-from services import actions, database as db
+from services import actions, database as db, memory
 
 log = logging.getLogger("nixi.housekeeping")
+
+
+def dead_chat_delay_seconds(row: dict) -> int:
+    count = max(0, int(row.get("dead_ping_count") or 0)) if row.get("last_message_is_bot") else 0
+    return max(1, config.DEAD_CHAT_IDLE_SECONDS) * (2 ** count)
 
 
 class HousekeepingCog(commands.Cog):
@@ -31,7 +36,7 @@ class HousekeepingCog(commands.Cog):
         self.housekeeping_loop.cancel()
         self.sticker_spam_loop.cancel()
 
-    @tasks.loop(seconds=60)
+    @tasks.loop(seconds=15)
     async def housekeeping_loop(self) -> None:
         for task in (self._maybe_send_morning_news, self._maybe_nudge_dead_chat):
             try:
@@ -94,11 +99,7 @@ class HousekeepingCog(commands.Cog):
         candidates = await db.get_channel_idle_candidates(config.DEAD_CHAT_CHANNEL_IDS or None)
         for row in candidates:
             idle = float(row.get("idle_seconds") or 0)
-            cooldown = row.get("cooldown_seconds")
-            cooldown = float(cooldown) if cooldown is not None else None
-            if idle < config.DEAD_CHAT_IDLE_SECONDS:
-                continue
-            if cooldown is not None and cooldown < config.DEAD_CHAT_COOLDOWN_SECONDS:
+            if idle < dead_chat_delay_seconds(row):
                 continue
 
             channel = self.bot.get_channel(int(row["channel_id"]))
@@ -107,14 +108,17 @@ class HousekeepingCog(commands.Cog):
             if config.DEAD_CHAT_CHANNEL_IDS and channel.id not in config.DEAD_CHAT_CHANNEL_IDS:
                 continue
 
-            member = self._pick_random_member(channel)
-            if not member:
-                continue
-
-            await channel.send(
-                f"ded chat. {member.mention}, kindly administer conversational CPR."
-            )
-            await db.mark_dead_chat_ping(channel.id)
+            async with memory.channel_lock(channel.id):
+                fresh = await db.get_channel_idle_candidates([channel.id])
+                if not fresh or float(fresh[0].get("idle_seconds") or 0) < dead_chat_delay_seconds(fresh[0]):
+                    continue
+                member = self._pick_random_member(channel)
+                if not member:
+                    continue
+                await channel.send(
+                    f"ded chat. {member.mention}, kindly administer conversational CPR."
+                )
+                await db.mark_dead_chat_ping(channel.id)
 
     def _pick_random_member(self, channel: discord.TextChannel) -> discord.Member | None:
         eligible = [

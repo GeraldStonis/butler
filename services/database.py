@@ -150,6 +150,15 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             PRIMARY KEY (guild_id, user_id, fact_key)
         );
     """)
+    cursor = await db.execute("PRAGMA table_info(channel_activity)")
+    columns = {row["name"] for row in await cursor.fetchall()}
+    for name, definition in (
+        ("dead_ping_count", "INTEGER NOT NULL DEFAULT 0"),
+        ("last_message_is_bot", "INTEGER NOT NULL DEFAULT 0"),
+        ("last_channel_message_at", "TIMESTAMP"),
+    ):
+        if name not in columns:
+            await db.execute(f"ALTER TABLE channel_activity ADD COLUMN {name} {definition}")
     await db.commit()
 
 
@@ -196,13 +205,32 @@ async def record_user_activity(
     )
     await db.execute(
         """INSERT INTO channel_activity
-           (channel_id, guild_id, last_user_id, last_message_at)
-           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+           (channel_id, guild_id, last_user_id, last_message_at, last_channel_message_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
            ON CONFLICT(channel_id) DO UPDATE SET
                guild_id = excluded.guild_id,
                last_user_id = excluded.last_user_id,
-               last_message_at = CURRENT_TIMESTAMP""",
+               last_message_at = CURRENT_TIMESTAMP,
+               last_channel_message_at = CURRENT_TIMESTAMP,
+               last_message_is_bot = 0,
+               dead_ping_count = 0,
+               last_dead_ping_at = NULL""",
         (channel_id, guild_id, user_id),
+    )
+    await db.commit()
+
+
+async def record_bot_activity(guild_id: int | None, channel_id: int) -> None:
+    if guild_id is None:
+        return
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO channel_activity
+           (channel_id, guild_id, last_message_is_bot, last_channel_message_at)
+           VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+           ON CONFLICT(channel_id) DO UPDATE SET
+           last_message_is_bot=1, last_channel_message_at=CURRENT_TIMESTAMP""",
+        (channel_id, guild_id),
     )
     await db.commit()
 
@@ -231,8 +259,8 @@ async def get_channel_idle_candidates(
         placeholders = ",".join("?" for _ in channel_ids)
         cursor = await db.execute(
             f"""SELECT channel_id, guild_id, last_user_id, last_message_at,
-                       last_dead_ping_at,
-                       (julianday('now') - julianday(last_message_at)) * 86400.0 AS idle_seconds,
+                       last_dead_ping_at, dead_ping_count, last_message_is_bot,
+                       (julianday('now') - julianday(COALESCE(last_channel_message_at, last_message_at))) * 86400.0 AS idle_seconds,
                        CASE
                            WHEN last_dead_ping_at IS NULL THEN NULL
                            ELSE (julianday('now') - julianday(last_dead_ping_at)) * 86400.0
@@ -244,8 +272,8 @@ async def get_channel_idle_candidates(
     else:
         cursor = await db.execute(
             """SELECT channel_id, guild_id, last_user_id, last_message_at,
-                      last_dead_ping_at,
-                      (julianday('now') - julianday(last_message_at)) * 86400.0 AS idle_seconds,
+                      last_dead_ping_at, dead_ping_count, last_message_is_bot,
+                      (julianday('now') - julianday(COALESCE(last_channel_message_at, last_message_at))) * 86400.0 AS idle_seconds,
                       CASE
                           WHEN last_dead_ping_at IS NULL THEN NULL
                           ELSE (julianday('now') - julianday(last_dead_ping_at)) * 86400.0
@@ -261,10 +289,13 @@ async def mark_dead_chat_ping(channel_id: int) -> None:
     db = await get_db()
     await db.execute(
         """INSERT INTO channel_activity
-           (channel_id, last_dead_ping_at)
-           VALUES (?, CURRENT_TIMESTAMP)
+           (channel_id, last_dead_ping_at, dead_ping_count, last_message_is_bot, last_channel_message_at)
+           VALUES (?, CURRENT_TIMESTAMP, 1, 1, CURRENT_TIMESTAMP)
            ON CONFLICT(channel_id) DO UPDATE SET
-               last_dead_ping_at = CURRENT_TIMESTAMP""",
+               last_dead_ping_at = CURRENT_TIMESTAMP,
+               dead_ping_count = channel_activity.dead_ping_count + 1,
+               last_message_is_bot = 1,
+               last_channel_message_at = CURRENT_TIMESTAMP""",
         (channel_id,),
     )
     await db.commit()

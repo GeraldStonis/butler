@@ -68,6 +68,8 @@ class ChatCog(commands.Cog):
             await self._handle_message(message)
 
     async def _handle_message(self, message: discord.Message) -> None:
+        if message.author.bot:
+            await db.record_bot_activity(message.guild.id if message.guild else None, message.channel.id)
         if self.bot.user and message.author.id == self.bot.user.id:
             return
 
