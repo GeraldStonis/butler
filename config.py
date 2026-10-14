@@ -108,8 +108,6 @@ MEME_DROP_INTERVAL_SECONDS: int = max(60, int(os.environ.get("MEME_DROP_INTERVAL
 
 # Persona
 ACTIVITIES_ENABLED: bool = _bool_env("ACTIVITIES_ENABLED", True)
-AUTOMATIC_GAME_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("AUTOMATIC_GAME_CHANCE", "0.2"))))
-ENGAGEMENT_TOPIC_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("ENGAGEMENT_TOPIC_CHANCE", "0.35"))))
 AUTONOMOUS_MIN_GAP_SECONDS: int = max(0, int(os.environ.get("AUTONOMOUS_MIN_GAP_SECONDS", "120")))
 QUIET_HOURS: str = os.environ.get("QUIET_HOURS", "").strip()
 SERVER_TIMEZONE: str = os.environ.get("SERVER_TIMEZONE", "Asia/Kolkata")

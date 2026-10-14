@@ -422,16 +422,13 @@ async def set_member_preferences(guild_id: int, user_id: int, updates: dict[str,
     await connection.commit()
 
 
-async def recent_channel_members(channel_id: int) -> list[int]:
+async def get_dead_chat_opt_outs(guild_id: int) -> set[int]:
     connection = await get_db()
     cursor = await connection.execute(
-        """SELECT a.user_id FROM user_activity a LEFT JOIN member_preferences p
-           ON p.guild_id=a.guild_id AND p.user_id=a.user_id
-           WHERE a.channel_id=? AND a.last_message_at >= datetime('now','-7 days')
-           AND COALESCE(p.pings,1)=1 AND COALESCE(p.roasting,1)=1
-           ORDER BY a.last_message_at DESC LIMIT 30""", (channel_id,)
+        """SELECT user_id FROM member_preferences
+           WHERE guild_id=? AND (pings=0 OR roasting=0)""", (guild_id,)
     )
-    return [row['user_id'] for row in await cursor.fetchall()]
+    return {row['user_id'] for row in await cursor.fetchall()}
 
 
 async def get_recent_messages(

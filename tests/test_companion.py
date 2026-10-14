@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import discord
 import config
 from cogs.chat import ChatCog
-from cogs.housekeeping import HousekeepingCog, generate_conversation_topic
+from cogs.housekeeping import HousekeepingCog
 from services import conversation, database as db, engagement, intent, llm, memory, social
 
 
@@ -167,8 +167,8 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
             await memory._summarise_oldest(1, 2, version=old_version)
         self.assertIsNone(await db.get_latest_summary(1))
 
-    async def test_targets_are_recent_opted_in_and_not_the_last_target(self):
-        channel = SimpleNamespace(id=1, members=[SimpleNamespace(id=3, bot=False), SimpleNamespace(id=4, bot=False), SimpleNamespace(id=5, bot=False)])
+    async def test_targets_respect_opt_outs_and_vary_when_possible(self):
+        channel = SimpleNamespace(id=1, guild=SimpleNamespace(id=2), members=[SimpleNamespace(id=3, bot=False), SimpleNamespace(id=4, bot=False), SimpleNamespace(id=5, bot=False)])
         await db.record_user_activity(2, 1, 3, 'A')
         await db.record_user_activity(2, 1, 4, 'B')
         await db.record_user_activity(2, 1, 5, 'C')
@@ -177,12 +177,15 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         cog = object.__new__(HousekeepingCog)
         self.assertEqual((await cog._pick_random_member(channel)).id, 5)
 
-    async def test_new_conversation_opener_is_generated_and_not_a_copy(self):
-        previous = ['A suspiciously familiar conversation opener for this room.']
-        with patch.object(llm, 'generate_response', AsyncMock(side_effect=[previous[0], 'Which game deserves a sequel and which needs retirement?'])) as model:
-            line = await generate_conversation_topic(previous)
-            self.assertIn('sequel', line)
-            self.assertEqual(model.await_count, 2)
+    async def test_single_eligible_member_still_gets_old_style_ping(self):
+        member = SimpleNamespace(id=config.OWNER_ID + 1, bot=False)
+        channel = SimpleNamespace(id=1, guild=SimpleNamespace(id=2), members=[member])
+        # Random pings do not require recent participation or a different target.
+        await db.set_state('dead_chat_target:1', str(member.id))
+        cog = object.__new__(HousekeepingCog)
+        self.assertIs(await cog._pick_random_member(channel), member)
+        await db.set_member_preferences(2, member.id, {'pings': False})
+        self.assertIsNone(await cog._pick_random_member(channel))
 
     async def test_shared_autonomous_gap_is_persistent(self):
         with patch.object(config, 'QUIET_HOURS', ''), patch.object(config, 'AUTONOMOUS_MIN_GAP_SECONDS', 120):

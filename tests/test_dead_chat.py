@@ -25,9 +25,7 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         self.path_patch.start()
         self.interval_patch.start()
         self.gap_patch = patch('config.AUTONOMOUS_MIN_GAP_SECONDS', 0)
-        self.topic_patch = patch('config.ENGAGEMENT_TOPIC_CHANCE', 0)
         self.gap_patch.start()
-        self.topic_patch.start()
         await db.get_db()
 
     async def asyncTearDown(self):
@@ -35,7 +33,6 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         self.path_patch.stop()
         self.interval_patch.stop()
         self.gap_patch.stop()
-        self.topic_patch.stop()
         self.directory.cleanup()
 
     async def row(self):
@@ -115,6 +112,25 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
             row = await self.row()
             self.assertEqual(row['dead_ping_count'], 0)
             self.assertEqual(dead_chat_delay_seconds(row), 300)
+
+    async def test_dead_chat_uses_roast_ping_never_an_automatic_game(self):
+        await db.record_user_activity(1, 10, 20, 'Sam')
+        connection = await db.get_db()
+        await connection.execute("UPDATE channel_activity SET last_channel_message_at=datetime('now', '-61 seconds') WHERE channel_id=10")
+        await connection.commit()
+        channel = MagicMock(spec=discord.TextChannel)
+        channel.id = 10
+        channel.send = AsyncMock()
+        games = SimpleNamespace(active={}, start_game=AsyncMock(return_value=True))
+        cog = object.__new__(HousekeepingCog)
+        cog.bot = SimpleNamespace(get_channel=lambda _: channel, get_cog=lambda _: games)
+        cog._pick_random_member = AsyncMock(return_value=SimpleNamespace(id=20, mention='<@20>'))
+        # Old Railway variables must not re-enable the removed automatic behavior.
+        with patch('config.DEAD_CHAT_ENABLED', True), patch('config.DEAD_CHAT_CHANNEL_IDS', [10]), patch('config.AUTOMATIC_GAME_CHANCE', 1, create=True), patch('config.ENGAGEMENT_TOPIC_CHANCE', 1, create=True), patch('cogs.housekeeping.generate_dead_chat_line', AsyncMock(return_value='ded chat. Your keyboard wants a job.')):
+            await cog._maybe_nudge_dead_chat()
+        games.start_game.assert_not_awaited()
+        self.assertEqual(channel.send.await_args.args[0], '<@20> ded chat. Your keyboard wants a job.')
+        self.assertEqual((await self.row())['dead_ping_count'], 1)
 
     async def test_generated_line_retries_examples_and_strips_extra_pings(self):
         example = DEAD_CHAT_EXAMPLES[0].replace('{member}, ', '')

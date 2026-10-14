@@ -168,12 +168,13 @@ guest-command refusals are generated afresh by the LLM, using stored lines only
 as examples and avoiding the previous reply. Generation failure skips the reply
 instead of selecting a canned fallback.
 
-By default, 35% of non-game revival attempts become a newly generated, unmentioned
-conversation opener rather than another demand to talk. These can be a harmless
-hot take, this-or-that choice, or a curious question. They count toward the same
-five-nudge cap and exponential schedule. Roast pings choose recent participants,
-respect opt-outs, and avoid the previous target; with no suitable target Nixi
-opens a topic without pinging anyone. Unsolicited memes, music, and nudges share
+Dead-chat revival uses the original roast-and-ping behavior: a freshly generated
+roast plus one random non-bot member's mention, excluding Ronix and members who
+opted out of pings or teasing. Targets vary when possible; a single eligible
+member can still be selected. With no eligible member, no nudge is sent.
+Games and conversation openers never replace these nudges. Old
+`AUTOMATIC_GAME_CHANCE` and `ENGAGEMENT_TOPIC_CHANCE` variables are ignored.
+Unsolicited memes, music, and nudges share
 a two-minute channel cooldown, so they do not arrive in a burst. Provider failures
 back off instead of repeatedly generating a nudge every 15 seconds.
 
@@ -217,8 +218,8 @@ decoded text, batch caching, rate limiting and a persistent no-repeat question l
 Higher-or-lower uses [Deck of Cards](https://deckofcardsapi.com/), five 60-second
 rounds, ace high, and no points for ties. A game ends early if nobody participates.
 Only one game runs per channel; inactive buttons close even if users keep clicking.
-Nixi has a 20% chance to replace the first dead-chat nudge with a game; it counts
-toward the existing five-nudge limit. Other nudges mix roasts and conversation openers.
+Games start only on Ronix's explicit natural-language request, never automatically
+as a replacement for dead-chat roast pings.
 Captioned reactions use [Cataas](https://cataas.com/). Meme and cat captions are
 invented independently: no server conversation is sent to these image APIs.
 The new public APIs need no extra keys; caption writing uses the existing LLM.
@@ -236,7 +237,6 @@ No voice-channel playback is involved.
 
 ```env
 ACTIVITIES_ENABLED=true
-AUTOMATIC_GAME_CHANCE=0.2
 MUSIC_DROP_ENABLED=true
 MUSIC_CHANNEL_IDS=your-chat-channel-id
 SONGS_PATH=songs_data.json
