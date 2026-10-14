@@ -260,6 +260,26 @@ New settings have defaults; do not replace your existing Railway variables or
 check `.env` into Git. The new preference table is created automatically in the
 existing database. Upgrade dependencies during redeployment (`ollama>=0.6.2`).
 
+The included [Nixpacks install override](https://nixpacks.com/docs/configuration/file)
+creates the build virtualenv and runs `scripts/install_dependencies.py` with that
+virtualenv's Python. It upgrades pip, disables pip's download cache, uses public
+PyPI over HTTPS, and gives each install stage up to three attempts with backoff.
+Connection and incomplete-download retries are also enabled. Failed installs or
+dependency conflicts still fail the build; the bot is never launched during install.
+
+If a build fails with `JSONDecodeError: Unterminated string` inside pip's
+`parse_links`, pip received malformed package-index JSON, not a bot configuration
+or Python syntax error. Push `nixpacks.toml` and `scripts/install_dependencies.py`
+with the rest of the project and rebuild. If Railway has a custom install/build
+command or `NIXPACKS_INSTALL_CMD` overriding the project settings, remove that
+override so the install phase uses the script. This hardening helps transient
+index/cache failures; persistent PyPI or builder-network failures can still require
+another build or provider investigation.
+
+Docker's `SecretsUsedInArgOrEnv` and `UndefinedVar` entries in the supplied build
+log are separate warnings, not the fatal pip error. Do not publish build images
+containing secrets or commit `.env`; keep credentials in your Railway variables.
+
 ## Model Tuning And Checks
 
 GPT-OSS 120B remains the default. `OLLAMA_THINKING_LEVEL=low` uses its named
