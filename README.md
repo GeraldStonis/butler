@@ -168,6 +168,13 @@ guest-command refusals are generated afresh by the LLM, using stored lines only
 as examples and avoiding the previous reply. Generation failure skips the reply
 instead of selecting a canned fallback.
 
+Dead-chat pings are paused daily from midnight up to, but not including, 08:00
+in `SERVER_TIMEZONE` (Asia/Kolkata by default), using
+`DEAD_CHAT_QUIET_HOURS=00:00-08:00`. This window affects only dead-chat nudges,
+not normal replies, memes, music, or stickers. It does not consume or reset the
+five-ping counter; the normal schedule resumes after 08:00 when a nudge is due.
+Set this value to blank to disable the dead-chat-specific window.
+
 Dead-chat revival uses the original roast-and-ping behavior: a freshly generated
 roast plus one random non-bot member's mention, excluding Ronix and members who
 opted out of pings or teasing. Targets vary when possible; a single eligible
@@ -187,6 +194,11 @@ activity in, or set to comma-separated channel IDs.
 
 Set `STICKER_SPAM_CHANNEL_ID` to your spam channel ID to send one random server
 sticker every `STICKER_SPAM_INTERVAL_SECONDS`.
+Scheduled stickers and automatic meme/music drops in that channel pause from
+midnight until 08:00 in `SERVER_TIMEZONE`, using `SPAM_QUIET_HOURS=00:00-08:00`
+by default. Normal replies and Ronix's direct requests still work overnight;
+scheduled drops in other channels are unchanged. Set `SPAM_QUIET_HOURS` to blank
+to disable this additional window. Skipped overnight posts are not queued.
 
 ## Project Structure
 

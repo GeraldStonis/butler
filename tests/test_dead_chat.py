@@ -2,12 +2,14 @@ import sqlite3
 import tempfile
 import unittest
 from contextlib import closing
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
 from services import database as db
+from services.engagement import dead_chat_quiet_now, quiet_now
 from cogs.housekeeping import HousekeepingCog, dead_chat_delay_seconds, dead_chat_due, generate_dead_chat_line, DEAD_CHAT_EXAMPLES
 
 
@@ -26,6 +28,8 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         self.interval_patch.start()
         self.gap_patch = patch('config.AUTONOMOUS_MIN_GAP_SECONDS', 0)
         self.gap_patch.start()
+        self.quiet_patch = patch('cogs.housekeeping.engagement.dead_chat_quiet_now', return_value=False)
+        self.quiet_patch.start()
         await db.get_db()
 
     async def asyncTearDown(self):
@@ -33,6 +37,7 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         self.path_patch.stop()
         self.interval_patch.stop()
         self.gap_patch.stop()
+        self.quiet_patch.stop()
         self.directory.cleanup()
 
     async def row(self):
@@ -140,3 +145,66 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn('<@999>', line)
             self.assertIn('keyboard wants a comeback', line)
             self.assertEqual(model.await_count, 2)
+
+    async def test_quiet_hours_skip_work_and_preserve_ping_counter(self):
+        await db.record_user_activity(1, 10, 20, 'Sam')
+        await db.mark_dead_chat_ping(10)
+        before = await self.row()
+        cog = object.__new__(HousekeepingCog)
+        cog.bot = MagicMock()
+        with patch('config.DEAD_CHAT_ENABLED', True), patch('cogs.housekeeping.engagement.dead_chat_quiet_now', return_value=True), patch('cogs.housekeeping.db.get_channel_idle_candidates', new_callable=AsyncMock) as candidates, patch('cogs.housekeeping.generate_dead_chat_line', new_callable=AsyncMock) as generate:
+            await cog._maybe_nudge_dead_chat()
+        candidates.assert_not_awaited()
+        generate.assert_not_awaited()
+        cog.bot.get_channel.assert_not_called()
+        after = await self.row()
+        self.assertEqual(after['dead_ping_count'], before['dead_ping_count'])
+        self.assertEqual(after['last_dead_ping_at'], before['last_dead_ping_at'])
+
+    async def test_generation_crossing_midnight_does_not_ping(self):
+        await db.record_user_activity(1, 10, 20, 'Sam')
+        connection = await db.get_db()
+        await connection.execute("UPDATE channel_activity SET last_channel_message_at=datetime('now', '-61 seconds') WHERE channel_id=10")
+        await connection.commit()
+        channel = MagicMock(spec=discord.TextChannel)
+        channel.id = 10
+        channel.send = AsyncMock()
+        cog = object.__new__(HousekeepingCog)
+        cog.bot = SimpleNamespace(get_channel=lambda _: channel)
+        cog._pick_random_member = AsyncMock(return_value=SimpleNamespace(id=20, mention='<@20>'))
+        with patch('config.DEAD_CHAT_ENABLED', True), patch('config.DEAD_CHAT_CHANNEL_IDS', [10]), patch('cogs.housekeeping.engagement.dead_chat_quiet_now', side_effect=[False, True]), patch('cogs.housekeeping.generate_dead_chat_line', AsyncMock(return_value='ded chat. Your keyboard wants a comeback.')) as generate:
+            await cog._maybe_nudge_dead_chat()
+        generate.assert_awaited_once()
+        channel.send.assert_not_awaited()
+        row = await self.row()
+        self.assertEqual(row['dead_ping_count'], 0)
+        self.assertIsNone(row['last_dead_ping_at'])
+
+
+class DeadChatQuietHoursTests(unittest.TestCase):
+    def setUp(self):
+        self.hours_patch = patch('config.DEAD_CHAT_QUIET_HOURS', '00:00-08:00')
+        self.zone_patch = patch('config.SERVER_TIMEZONE', 'Asia/Kolkata')
+        self.hours_patch.start()
+        self.zone_patch.start()
+        self.addCleanup(self.hours_patch.stop)
+        self.addCleanup(self.zone_patch.stop)
+
+    def test_midnight_is_inclusive_and_eight_am_is_exclusive(self):
+        for hour, minute, expected in [(23, 59, False), (0, 0, True), (7, 59, True), (8, 0, False)]:
+            with self.subTest(hour=hour, minute=minute):
+                self.assertEqual(dead_chat_quiet_now(datetime(2026, 10, 15, hour, minute)), expected)
+
+    def test_utc_clock_is_converted_to_server_timezone(self):
+        self.assertTrue(dead_chat_quiet_now(datetime(2026, 10, 14, 18, 30, tzinfo=timezone.utc)))
+        self.assertFalse(dead_chat_quiet_now(datetime(2026, 10, 15, 2, 30, tzinfo=timezone.utc)))
+
+    def test_dead_chat_window_does_not_enable_global_quiet_hours(self):
+        with patch('config.QUIET_HOURS', ''):
+            now = datetime(2026, 10, 15, 3, 0)
+            self.assertTrue(dead_chat_quiet_now(now))
+            self.assertFalse(quiet_now(now))
+
+    def test_blank_setting_disables_dead_chat_window(self):
+        with patch('config.DEAD_CHAT_QUIET_HOURS', ''):
+            self.assertFalse(dead_chat_quiet_now(datetime(2026, 10, 15, 3, 0)))

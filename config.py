@@ -95,11 +95,13 @@ DEAD_CHAT_ENABLED: bool = _bool_env("DEAD_CHAT_ENABLED", False)
 DEAD_CHAT_IDLE_SECONDS: int = int(os.environ.get("DEAD_CHAT_IDLE_SECONDS", "300"))
 DEAD_CHAT_COOLDOWN_SECONDS: int = int(os.environ.get("DEAD_CHAT_COOLDOWN_SECONDS", "3600"))
 DEAD_CHAT_CHANNEL_IDS: list[int] = _int_list_env("DEAD_CHAT_CHANNEL_IDS")
+DEAD_CHAT_QUIET_HOURS: str = os.environ.get("DEAD_CHAT_QUIET_HOURS", "00:00-08:00").strip()
 
 # Sticker spam
 STICKER_SPAM_ENABLED: bool = _bool_env("STICKER_SPAM_ENABLED", False)
 STICKER_SPAM_CHANNEL_ID: int = int(os.environ.get("STICKER_SPAM_CHANNEL_ID", "0") or "0")
 STICKER_SPAM_INTERVAL_SECONDS: int = int(os.environ.get("STICKER_SPAM_INTERVAL_SECONDS", "60"))
+SPAM_QUIET_HOURS: str = os.environ.get("SPAM_QUIET_HOURS", "00:00-08:00").strip()
 
 # Independent meme drops, using the spam channel unless another is specified.
 MEME_DROP_ENABLED: bool = _bool_env("MEME_DROP_ENABLED", True)

@@ -164,7 +164,7 @@ class HousekeepingCog(commands.Cog):
         await db.set_state(state_key, today_key)
 
     async def _maybe_nudge_dead_chat(self) -> None:
-        if not config.DEAD_CHAT_ENABLED:
+        if not config.DEAD_CHAT_ENABLED or engagement.dead_chat_quiet_now():
             return
 
         candidates = await db.get_channel_idle_candidates(config.DEAD_CHAT_CHANNEL_IDS or None)
@@ -206,6 +206,8 @@ class HousekeepingCog(commands.Cog):
                     continue
                 latest = await db.get_channel_idle_candidates([channel.id])
                 if not latest or latest[0]["last_message_at"] != fresh[0]["last_message_at"]:
+                    continue
+                if engagement.dead_chat_quiet_now() or not await engagement.can_post(channel.id):
                     continue
                 sent = await channel.send(
                     f"{member.mention} {line}",
@@ -262,6 +264,8 @@ class HousekeepingCog(commands.Cog):
         last_key = f"meme_drop_last:{channel.id}"
         if await db.get_state(last_key) == result.url:
             return
+        if not await engagement.can_post(channel.id):
+            return
         sent = await channel.send(embed=actions._media_embed(result), allowed_mentions=discord.AllowedMentions.none())
         await memory.log_delivery(sent)
         await db.set_state(last_key, result.url)
@@ -296,6 +300,8 @@ class HousekeepingCog(commands.Cog):
                     continue
                 if games and channel.id in games.active:
                     continue
+                if not await engagement.can_post(channel.id):
+                    continue
                 # Ordinary URLs let Discord create a native playable YouTube preview.
                 sent = await channel.send(f"{line}\nhttps://www.youtube.com/watch?v={song['youtubeId']}",
                                    allowed_mentions=discord.AllowedMentions.none())
@@ -304,7 +310,9 @@ class HousekeepingCog(commands.Cog):
                 await engagement.mark_sent(channel.id)
 
     async def _maybe_send_random_sticker(self) -> None:
-        if not config.STICKER_SPAM_ENABLED or not config.STICKER_SPAM_CHANNEL_ID or engagement.quiet_now():
+        if not config.STICKER_SPAM_ENABLED or not config.STICKER_SPAM_CHANNEL_ID:
+            return
+        if engagement.quiet_now() or engagement.spam_quiet_now(config.STICKER_SPAM_CHANNEL_ID):
             return
 
         channel = self.bot.get_channel(config.STICKER_SPAM_CHANNEL_ID)
@@ -318,6 +326,8 @@ class HousekeepingCog(commands.Cog):
             return
 
         sticker = random.choice(stickers)
+        if engagement.quiet_now() or engagement.spam_quiet_now(channel.id):
+            return
         try:
             await channel.send(stickers=[sticker])
         except discord.HTTPException:
