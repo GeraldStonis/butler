@@ -71,8 +71,8 @@ TENOR_API_KEY: str = os.environ.get("TENOR_API_KEY", "")
 GIPHY_API_KEY: str = os.environ.get("GIPHY_API_KEY", "")
 MEDIA_SAFE_MODE: bool = _bool_env("MEDIA_SAFE_MODE", True)
 AUTOMATIC_MEDIA_ENABLED: bool = _bool_env("AUTOMATIC_MEDIA_ENABLED", True)
-AUTOMATIC_MEDIA_COOLDOWN_SECONDS: int = max(0, int(os.environ.get("AUTOMATIC_MEDIA_COOLDOWN_SECONDS", "180")))
-AUTOMATIC_MEDIA_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("AUTOMATIC_MEDIA_CHANCE", "0.3"))))
+AUTOMATIC_MEDIA_COOLDOWN_SECONDS: int = max(0, int(os.environ.get("AUTOMATIC_MEDIA_COOLDOWN_SECONDS", "45")))
+AUTOMATIC_MEDIA_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("AUTOMATIC_MEDIA_CHANCE", "0.95"))))
 
 # Morning news
 MORNING_NEWS_ENABLED: bool = _bool_env("MORNING_NEWS_ENABLED", False)
@@ -85,7 +85,7 @@ MORNING_NEWS_TOPICS: list[str] = _list_env(
 
 # Dead chat nudges
 DEAD_CHAT_ENABLED: bool = _bool_env("DEAD_CHAT_ENABLED", False)
-DEAD_CHAT_IDLE_SECONDS: int = int(os.environ.get("DEAD_CHAT_IDLE_SECONDS", "60"))
+DEAD_CHAT_IDLE_SECONDS: int = int(os.environ.get("DEAD_CHAT_IDLE_SECONDS", "300"))
 DEAD_CHAT_COOLDOWN_SECONDS: int = int(os.environ.get("DEAD_CHAT_COOLDOWN_SECONDS", "3600"))
 DEAD_CHAT_CHANNEL_IDS: list[int] = _int_list_env("DEAD_CHAT_CHANNEL_IDS")
 

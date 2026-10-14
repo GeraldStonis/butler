@@ -87,6 +87,14 @@ class MemberMemoryTests(unittest.IsolatedAsyncioTestCase):
         owner_context = await memory.build_context(10, "hello", "Changed nickname", "DIRECT_ADDRESS", guild_id=1, current_author_id=config.OWNER_ID)
         owner_authority = next(m["content"] for m in owner_context if m["content"].startswith("TRUSTED CURRENT SPEAKER CONTEXT:"))
         self.assertIn("current speaker is your verified employer, Sir Ronix", owner_authority)
+        self.assertIn("Do not say you miss him", owner_authority)
+
+    async def test_missing_owner_remark_requires_observed_inactivity(self):
+        for idle, expected in [(None, "activity is unknown"), (5, "has spoken recently"), (600, "miss his company")]:
+            with patch.object(db, 'get_user_idle_seconds', AsyncMock(return_value=idle)):
+                context = await memory.build_context(10, 'hello', 'Guest', 'DIRECT_ADDRESS', guild_id=1, current_author_id=config.OWNER_ID + 1)
+                authority = next(m['content'] for m in context if m['content'].startswith('TRUSTED CURRENT SPEAKER CONTEXT:'))
+                self.assertIn(expected, authority)
 
     def test_natural_requests_and_explanatory_question(self):
         self.assertIsNone(intent.heuristic_intent("nixi reset your recent memory"))

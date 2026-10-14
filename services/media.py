@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import logging
+import asyncio
+import hashlib
 import random
 from dataclasses import dataclass
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlsplit, urlunsplit
 
 import httpx
 
 import config
-from services import search
+from services import search, database as db
 
 log = logging.getLogger("nixi.media")
 
@@ -21,6 +23,7 @@ class MediaResult:
     url: str
     source_url: str = ""
     attribution: str = ""
+    standalone: bool = False
 
 
 SAFE_ACTION_QUERIES = {
@@ -36,21 +39,57 @@ SAFE_ACTION_QUERIES = {
 
 
 async def fetch_meme() -> MediaResult | None:
-    """Fetch a meme from a simple no-key API."""
-    async with httpx.AsyncClient(timeout=12, follow_redirects=True) as client:
-        response = await client.get("https://meme-api.com/gimme")
-        response.raise_for_status()
-        data = response.json()
-    if config.MEDIA_SAFE_MODE and (data.get("nsfw") or data.get("spoiler")):
+    """Select a previously unseen meme; skip rather than recycle old images."""
+    try:
+        return await asyncio.wait_for(_fetch_unique_meme(), timeout=20)
+    except asyncio.TimeoutError:
+        log.warning("No new meme found within the search time budget")
         return None
-    url = data.get("url") or data.get("preview", [None])[-1]
-    if not url:
-        return None
-    return MediaResult(
-        title=data.get("title", "A meme, presented on a silver tray."),
-        url=url,
-        source_url=data.get("postLink", ""),
-    )
+
+
+def _meme_url_key(url: str) -> str:
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path, "", ""))
+
+
+async def _fetch_unique_meme() -> MediaResult | None:
+    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        for _ in range(2):
+            response = await client.get("https://meme-api.com/gimme/8")
+            response.raise_for_status()
+            candidates = response.json().get("memes", [])
+            random.shuffle(candidates)
+            for item in candidates:
+                if config.MEDIA_SAFE_MODE and (item.get("nsfw") or item.get("spoiler")):
+                    continue
+                previews = item.get("preview") or []
+                url = item.get("url") or (previews[-1] if previews else None)
+                if not url:
+                    continue
+                image_key = _meme_url_key(url)
+                post_url = item.get("postLink") or ""
+                post_key = _meme_url_key(post_url) if post_url else None
+                if await db.meme_is_known(image_key, post_key):
+                    continue
+                fingerprint = hashlib.sha256()
+                try:
+                    async with client.stream("GET", url) as image_response:
+                        image_response.raise_for_status()
+                        if not image_response.headers.get("content-type", "").startswith("image/"):
+                            continue
+                        size = 0
+                        async for chunk in image_response.aiter_bytes():
+                            size += len(chunk)
+                            if size > 8 * 1024 * 1024:
+                                break
+                            fingerprint.update(chunk)
+                        if not size or size > 8 * 1024 * 1024:
+                            continue
+                except httpx.HTTPError:
+                    continue
+                if await db.claim_meme(fingerprint.hexdigest(), image_key, post_key):
+                    return MediaResult(title=item.get("title") or "A meme.", url=url, source_url=post_url)
+    return None
 
 
 async def fetch_gif(query: str) -> MediaResult | None:

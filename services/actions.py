@@ -84,7 +84,7 @@ async def execute_owner_intent(
         if name == "meme":
             result = await media.fetch_meme()
             if not result:
-                await message.reply("The meme tray returned empty, a tragedy in three acts.", mention_author=False)
+                await message.reply("No new meme available right now. I'll skip the reruns.", mention_author=False)
                 return True
             sent = await message.reply(filter_links(result.title[:2000], requests_links(message.content)) or None, embed=_media_embed(result), mention_author=False)
             await memory.log_message(

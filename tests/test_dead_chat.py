@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
 from services import database as db
-from cogs.housekeeping import HousekeepingCog, dead_chat_delay_seconds
+from cogs.housekeeping import HousekeepingCog, dead_chat_delay_seconds, dead_chat_due, generate_dead_chat_line, DEAD_CHAT_EXAMPLES
 
 
 class DeadChatTests(unittest.IsolatedAsyncioTestCase):
@@ -71,11 +71,11 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         channel.send = AsyncMock()
         cog = object.__new__(HousekeepingCog)
         cog.bot = SimpleNamespace(get_channel=lambda _: channel)
-        cog._pick_random_member = lambda _: SimpleNamespace(mention='<@20>')
+        cog._pick_random_member = lambda _: SimpleNamespace(id=20, mention='<@20>')
         async def age(seconds):
             await connection.execute("UPDATE channel_activity SET last_channel_message_at=datetime('now', ?) WHERE channel_id=10", (f'-{seconds} seconds',))
             await connection.commit()
-        with patch('config.DEAD_CHAT_ENABLED', True), patch('config.DEAD_CHAT_CHANNEL_IDS', [10]):
+        with patch('config.DEAD_CHAT_ENABLED', True), patch('config.DEAD_CHAT_CHANNEL_IDS', [10]), patch('cogs.housekeeping.generate_dead_chat_line', AsyncMock(side_effect=['ded chat. Your keyboard is on unpaid leave. Give it a topic.', 'ded chat. The silence has tenure. Challenge it.'])):
             await age(61)
             await cog._maybe_nudge_dead_chat()
             self.assertEqual(channel.send.await_count, 1)
@@ -90,3 +90,31 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotEqual(channel.send.call_args.args[0], first_line)
             self.assertIn('<@20>', channel.send.call_args.args[0])
             self.assertEqual(dead_chat_delay_seconds(await self.row()), 240)
+
+    async def test_five_ping_cap_survives_restart_and_human_resets(self):
+        with patch('config.DEAD_CHAT_IDLE_SECONDS', 300):
+            await db.record_user_activity(1, 10, 20, 'Sam')
+            for delay in [300, 600, 1200, 2400, 4800]:
+                self.assertEqual(dead_chat_delay_seconds(await self.row()), delay)
+                await db.mark_dead_chat_ping(10)
+            connection = await db.get_db()
+            await connection.execute("UPDATE channel_activity SET last_channel_message_at=datetime('now', '-99999 seconds') WHERE channel_id=10")
+            await connection.commit()
+            self.assertFalse(dead_chat_due(await self.row()))
+            await db.close()
+            self.assertFalse(dead_chat_due(await self.row()))
+            await db.record_bot_activity(1, 10)
+            self.assertFalse(dead_chat_due(await self.row()))
+            await db.record_user_activity(1, 10, 21, 'Another member')
+            row = await self.row()
+            self.assertEqual(row['dead_ping_count'], 0)
+            self.assertEqual(dead_chat_delay_seconds(row), 300)
+
+    async def test_generated_line_retries_examples_and_strips_extra_pings(self):
+        example = DEAD_CHAT_EXAMPLES[0].replace('{member}, ', '')
+        with patch('cogs.housekeeping.llm.generate_response', AsyncMock(side_effect=[example, 'ded chat. @everyone <@999> Your keyboard wants a comeback. Give it one.'])) as model:
+            line = await generate_dead_chat_line(None, 0)
+            self.assertNotIn('@everyone', line)
+            self.assertNotIn('<@999>', line)
+            self.assertIn('keyboard wants a comeback', line)
+            self.assertEqual(model.await_count, 2)

@@ -33,6 +33,7 @@ async def generate_response(
     messages: list[dict[str, str]],
     temperature: float = 0.85,
     max_tokens: int = 600,
+    failure_reply: str | None = None,
 ) -> str:
     """
     Send a chat request and return the assistant's reply.
@@ -66,6 +67,8 @@ async def generate_response(
         return ""
     except Exception:
         log.exception("LLM call failed")
+        if failure_reply is not None:
+            return failure_reply
         return (
             "I do beg your pardon -- a momentary lapse in my faculties. "
             "Might I suggest trying again in a moment?"

@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import random
 import time
+import json
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -12,11 +14,12 @@ import discord
 from discord.ext import commands, tasks
 
 import config
-from services import actions, database as db, memory, media
+from services import actions, database as db, memory, media, llm
+from services.response_text import filter_links
 
 log = logging.getLogger("nixi.housekeeping")
 
-DEAD_CHAT_LINES = (
+DEAD_CHAT_EXAMPLES = (
     "ded chat. {member}, all that aura and not one conversation. Say something.",
     "ded chat. {member}, the typing indicator has more personality today. Defend your reputation.",
     "ded chat. {member}, lurking is not a competitive sport. Drop a take.",
@@ -29,12 +32,60 @@ DEAD_CHAT_LINES = (
     "ded chat. {member}, everyone suddenly has a life? Suspicious. Start some harmless discourse.",
     "ded chat. {member}, zero messages, maximum screen time. Make that ratio less embarrassing.",
     "ded chat. {member}, the group project needs you to contribute one sentence. Begin.",
+    "ded chat. {member}, your last contribution was an online status. Raise the bar.",
+    "ded chat. {member}, spectacular commitment to the mute-button lifestyle. Drop an opinion.",
+    "ded chat. {member}, the server has become your digital waiting room. Entertain the queue.",
+    "ded chat. {member}, posting 'real' every three days is not a personality. Give us a take.",
+    "ded chat. {member}, all those reaction GIFs and no original thought? Start a topic.",
+    "ded chat. {member}, the drawing room is quieter than your comeback folder. Open it.",
+    "ded chat. {member}, you have main-character notifications and background-extra dialogue. Speak.",
+    "ded chat. {member}, your keyboard called. It would like a job. Give us a sentence.",
+    "ded chat. {member}, this chat has less movement than your allegedly productive afternoon. Revive it.",
+    "ded chat. {member}, lurking with this much confidence should require a permit. Say something.",
+    "ded chat. {member}, surely the group can survive one of your questionable takes. Test it.",
+    "ded chat. {member}, the last topic died of natural causes. Bring a new one, not a eulogy.",
+    "ded chat. {member}, I have dusted the entire estate waiting for you to finish typing. Begin.",
+    "ded chat. {member}, even the pinned messages are carrying harder than you. Drop a topic.",
+    "ded chat. {member}, the yap factory has laid everyone off. Apply for the first shift.",
+    "ded chat. {member}, you cannot farm aura from an empty chat. Supply the content.",
+    "ded chat. {member}, Discord did not install itself so you could supervise silence. Talk.",
+    "ded chat. {member}, this server is serving loading-screen energy. Give it a plot.",
+    "ded chat. {member}, your notifications are on a hunger strike. Feed them a conversation.",
+    "ded chat. {member}, I see the online dot. Now show us the alleged personality. Start a topic.",
 )
 
 
 def dead_chat_delay_seconds(row: dict) -> int:
     count = max(0, int(row.get("dead_ping_count") or 0)) if row.get("last_message_is_bot") else 0
     return max(1, config.DEAD_CHAT_IDLE_SECONDS) * (2 ** count)
+
+
+def dead_chat_due(row: dict) -> bool:
+    return (int(row.get("dead_ping_count") or 0) < 5
+            and float(row.get("idle_seconds") or 0) >= dead_chat_delay_seconds(row))
+
+
+async def generate_dead_chat_line(previous: str | None, count: int) -> str:
+    for _ in range(2):
+        text = await llm.generate_response([
+            {"role": "system", "content": config.load_persona()},
+            {"role": "system", "content": (
+                "Generate a NEW playful roast inviting a quiet Discord chat to revive itself. "
+                "One or two short, sassy sentences, preferably saying 'ded chat'. Tease lurking "
+                "or a weak take, not identity or vulnerabilities. No threats or personal claims. "
+                "Do not include names, mentions, URLs, or placeholders; the application adds "
+                "one chosen member's mention. These are ONLY style examples, never copy them:\n"
+                + "\n".join(line.replace('{member}, ', '') for line in DEAD_CHAT_EXAMPLES)
+                + "\nDo not repeat the previous nudge. Output only the new message."
+            )},
+            {"role": "user", "content": json.dumps({"previous_nudge": previous, "nudge_number": count + 1})},
+        ], temperature=0.95, max_tokens=600, failure_reply="")
+        text = filter_links(text)
+        text = re.sub(r"<@[^>]*>|@(?:everyone|here)|\{member\}", "", text).strip()
+        examples = {line.replace('{member}, ', '').casefold() for line in DEAD_CHAT_EXAMPLES}
+        if text and len(text) <= 500 and text.casefold() != (previous or '').casefold() and text.casefold() not in examples:
+            return text
+    return ""
 
 
 class HousekeepingCog(commands.Cog):
@@ -114,8 +165,7 @@ class HousekeepingCog(commands.Cog):
 
         candidates = await db.get_channel_idle_candidates(config.DEAD_CHAT_CHANNEL_IDS or None)
         for row in candidates:
-            idle = float(row.get("idle_seconds") or 0)
-            if idle < dead_chat_delay_seconds(row):
+            if not dead_chat_due(row):
                 continue
 
             channel = self.bot.get_channel(int(row["channel_id"]))
@@ -126,20 +176,22 @@ class HousekeepingCog(commands.Cog):
 
             async with memory.channel_lock(channel.id):
                 fresh = await db.get_channel_idle_candidates([channel.id])
-                if not fresh or float(fresh[0].get("idle_seconds") or 0) < dead_chat_delay_seconds(fresh[0]):
+                if not fresh or not dead_chat_due(fresh[0]):
                     continue
                 member = self._pick_random_member(channel)
                 if not member:
                     continue
                 line_key = f"dead_chat_last_line:{channel.id}"
                 previous = await db.get_state(line_key)
-                template = random.choice([line for line in DEAD_CHAT_LINES if line != previous])
+                line = await generate_dead_chat_line(previous, int(fresh[0].get("dead_ping_count") or 0))
+                if not line:
+                    continue
                 await channel.send(
-                    template.format(member=member.mention),
-                    allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True, replied_user=False),
+                    f"{member.mention} {line}",
+                    allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=[discord.Object(id=member.id)], replied_user=False),
                 )
                 await db.mark_dead_chat_ping(channel.id)
-                await db.set_state(line_key, template)
+                await db.set_state(line_key, line)
 
     def _pick_random_member(self, channel: discord.TextChannel) -> discord.Member | None:
         eligible = [

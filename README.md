@@ -7,7 +7,7 @@ The key design rule is simple:
 
 - Everyone can chat with Nixi when they address him.
 - Guests can ask questions; explicit performance, media, roleplay, and errand
-  commands receive "Shush." instead of being carried out.
+  commands receive varied short, sassy refusals instead of being carried out.
 - Only `OWNER_ID` can make Nixi perform actions such as search, news, media,
   GIFs, memes, or targetted reaction GIFs.
 
@@ -32,14 +32,20 @@ The key design rule is simple:
   sends the same server's available `kidhar chali` sticker in that channel.
   Spaces, underscores, hyphens, and capitalization in the sticker name are ignored.
 - Random meme drops every 4-6 minutes by default, independently of chat replies.
+  All meme paths share a persistent SQLite history: post/image URL duplicates
+  and identical image bytes are rejected. Candidates are reserved atomically,
+  so concurrent requests do not reuse them. No new candidate means no rerun.
+  Image-byte checks are bounded to 8 MB and a 20-second overall search budget.
   `MEME_DROP_ENABLED` defaults to true, `MEME_DROP_INTERVAL_SECONDS` to 300;
   `MEME_DROP_CHANNEL_ID` defaults to the configured sticker/spam channel.
   The first drop waits one interval, and the next scheduled time survives restarts.
 - Rolling channel memory, summaries, long-term memories, and owner instructions.
 - Server emoji support without forcing an emoji into every reply.
 - Automatic contextual GIF/meme reactions accompany Nixi's own replies.
-  Defaults: enabled, 30% sampling, 180 seconds between attempts per channel.
+  Defaults: enabled, 95% sampling, 45 seconds between attempts per channel.
   The selector may choose no media; memes are checked for relevance by title.
+  Roast reactions include side-eye, smug, mic-drop, and facepalm GIFs. The LLM
+  can choose an embed-only reply when the GIF itself is the punchline.
 - Bot watcher rules for alerts from other bots.
 
 ## Member Memory And Resets
@@ -117,7 +123,7 @@ MORNING_NEWS_TIMEZONE=Asia/Kolkata
 MORNING_NEWS_TOPICS=world,india,technology,cybersecurity
 
 DEAD_CHAT_ENABLED=false
-DEAD_CHAT_IDLE_SECONDS=60
+DEAD_CHAT_IDLE_SECONDS=300
 DEAD_CHAT_CHANNEL_IDS=
 
 STICKER_SPAM_ENABLED=false
@@ -126,9 +132,14 @@ STICKER_SPAM_INTERVAL_SECONDS=60
 ```
 
 Dead-chat waits start at `DEAD_CHAT_IDLE_SECONDS`, then double after each
-unanswered nudge (60, 120, 240 seconds, and so on). Each wait is measured from
+unanswered nudge (5, 10, 20 minutes by default, and so on). Each wait is measured from
 the latest channel message. Any human message resets the sequence. Bot messages
 do not reset it. State survives restarts; the old fixed cooldown setting is ignored.
+At most five unanswered nudges are sent (5, 10, 20, 40, 80 minute waits at the
+default setting), then nudging stops until a human speaks. Nudge wording and
+guest-command refusals are generated afresh by the LLM, using stored lines only
+as examples and avoiding the previous reply. Generation failure skips the reply
+instead of selecting a canned fallback.
 
 `DEAD_CHAT_CHANNEL_IDS` may be left empty to consider channels Nixi has seen
 activity in, or set to comma-separated channel IDs.

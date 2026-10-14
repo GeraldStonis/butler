@@ -113,6 +113,18 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             value      TEXT NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS meme_history (
+            content_hash TEXT PRIMARY KEY,
+            image_url TEXT NOT NULL UNIQUE,
+            post_url TEXT UNIQUE,
+            selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS meme_history (
+            content_hash TEXT PRIMARY KEY,
+            image_url TEXT NOT NULL UNIQUE,
+            post_url TEXT UNIQUE,
+            selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
 
         CREATE TABLE IF NOT EXISTS member_profiles (
             guild_id INTEGER NOT NULL,
@@ -307,6 +319,50 @@ async def get_state(key: str) -> str | None:
     cursor = await db.execute("SELECT value FROM bot_state WHERE key = ?", (key,))
     row = await cursor.fetchone()
     return row["value"] if row else None
+
+
+async def meme_is_known(image_url: str, post_url: str | None) -> bool:
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT 1 FROM meme_history WHERE image_url=? OR post_url=?
+           UNION ALL SELECT 1 FROM bot_state
+           WHERE key LIKE 'meme_drop_last:%' AND value=? LIMIT 1""",
+        (image_url, post_url, image_url),
+    )
+    return await cursor.fetchone() is not None
+
+
+async def claim_meme(content_hash: str, image_url: str, post_url: str | None) -> bool:
+    """Atomically reserve a new image across all meme delivery paths."""
+    db = await get_db()
+    cursor = await db.execute(
+        "INSERT OR IGNORE INTO meme_history (content_hash, image_url, post_url) VALUES (?, ?, ?)",
+        (content_hash, image_url, post_url),
+    )
+    await db.commit()
+    return cursor.rowcount == 1
+
+
+async def meme_is_known(image_url: str, post_url: str | None) -> bool:
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT 1 FROM meme_history WHERE image_url=? OR post_url=?
+           UNION ALL SELECT 1 FROM bot_state
+           WHERE key LIKE 'meme_drop_last:%' AND value=? LIMIT 1""",
+        (image_url, post_url, image_url),
+    )
+    return await cursor.fetchone() is not None
+
+
+async def claim_meme(content_hash: str, image_url: str, post_url: str | None) -> bool:
+    """Atomically reserve a new image across all meme delivery paths."""
+    db = await get_db()
+    cursor = await db.execute(
+        "INSERT OR IGNORE INTO meme_history (content_hash, image_url, post_url) VALUES (?, ?, ?)",
+        (content_hash, image_url, post_url),
+    )
+    await db.commit()
+    return cursor.rowcount == 1
 
 
 async def set_state(key: str, value: str) -> None:
