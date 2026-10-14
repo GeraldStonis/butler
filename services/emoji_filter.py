@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 log = logging.getLogger("nixi.emoji")
 
 CUSTOM_EMOJI_RE = re.compile(r"<a?:(\w+)(?::(\d+))?>")
+SHORT_EMOJI_RE = re.compile(r"(?<![\w<:]):(\w+):")
 
 
 async def cache_emojis(bot: Bot) -> None:
@@ -69,8 +70,8 @@ async def filter_response(text: str, guild: discord.Guild | None, *, allow_links
                 text = pattern2.sub(f"<@{member.id}>", text)
 
     if not guild or not guild.emojis:
-        text = re.sub(r":(\w+):", "", text)
-        return CUSTOM_EMOJI_RE.sub("", text).strip()
+        text = CUSTOM_EMOJI_RE.sub("", text)
+        return SHORT_EMOJI_RE.sub("", text).strip()
 
     emoji_map = {e.name: e for e in guild.emojis}
     valid_ids = _get_guild_emoji_ids(guild)
@@ -91,5 +92,5 @@ async def filter_response(text: str, guild: discord.Guild | None, *, allow_links
             return f"<{prefix}:{e.name}:{e.id}>"
         return match.group(0)
 
-    text = re.sub(r":(\w+):", _replace_name, text)
+    text = SHORT_EMOJI_RE.sub(_replace_name, text)
     return re.sub(r"  +", " ", text).strip()
