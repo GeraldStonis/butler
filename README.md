@@ -28,6 +28,9 @@ The key design rule is simple:
 - Optional morning news briefing.
 - Optional dead-chat nudges after channel inactivity.
 - Optional random server sticker spam in a configured channel.
+- When a human sends `:stfu:` (typed or a static/animated custom emoji), Nixi
+  sends the same server's available `kidhar chali` sticker in that channel.
+  Spaces, underscores, hyphens, and capitalization in the sticker name are ignored.
 - Random meme drops every 4-6 minutes by default, independently of chat replies.
   `MEME_DROP_ENABLED` defaults to true, `MEME_DROP_INTERVAL_SECONDS` to 300;
   `MEME_DROP_CHANNEL_ID` defaults to the configured sticker/spam channel.

@@ -100,6 +100,9 @@ class ChatCog(commands.Cog):
             display_name=message.author.display_name,
         )
 
+        if await self._maybe_send_stfu_sticker(message):
+            return
+
         mode = await self._detect_mode(message)
         if mode is not None or memory.has_member_fact_candidate(content):
             asyncio.create_task(memory.extract_and_store_memories(
@@ -239,6 +242,34 @@ class ChatCog(commands.Cog):
                 return "DIRECT_ADDRESS"
 
         return None
+
+    async def _maybe_send_stfu_sticker(self, message: discord.Message) -> bool:
+        if not message.guild or message.author.bot:
+            return False
+        if not re.search(r"<a?:stfu:\d+>|(?<![\w:]):stfu:(?!\w)", message.content or "", re.I):
+            return False
+
+        def find_sticker(stickers):
+            return next((sticker for sticker in stickers
+                         if re.sub(r"[^a-z0-9]", "", sticker.name.lower()) == "kidharchali"
+                         and sticker.available), None)
+
+        sticker = find_sticker(message.guild.stickers)
+        if sticker is None:
+            try:
+                sticker = find_sticker(await message.guild.fetch_stickers())
+            except discord.HTTPException:
+                log.warning("Cannot fetch stickers for stfu trigger in guild %d", message.guild.id)
+                return True
+        if sticker is None:
+            log.warning("No available 'kidhar chali' sticker in guild %d", message.guild.id)
+            return True
+        try:
+            await message.channel.send(stickers=[sticker], allowed_mentions=discord.AllowedMentions.none())
+            await db.record_bot_activity(message.guild.id, message.channel.id)
+        except discord.HTTPException:
+            log.warning("Could not send 'kidhar chali' sticker in channel %d", message.channel.id)
+        return True
 
     def _mentions_owner(self, message: discord.Message) -> bool:
         if any(user.id == config.OWNER_ID for user in message.mentions):
