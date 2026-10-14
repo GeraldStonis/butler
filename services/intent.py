@@ -42,6 +42,16 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
     lower = cleaned.lower()
     target_id = _first_mention_id(mentions)
 
+    if re.search(r"\b(?:start|play|host|give|gimme|launch)\b.*\b(?:trivia|quiz)\b", lower) or lower in {"trivia", "quiz"}:
+        return OwnerIntent("trivia")
+    if (re.search(r"\b(?:start|play|host|launch)\b.*\b(?:higher[ -](?:or[ -])?lower|high[ -]low)\b", lower)
+            or lower.strip(" .!?") in {"higher or lower", "higher-lower", "high low"}):
+        return OwnerIntent("cards")
+    if re.search(r"\b(?:leaderboard|game scores)\b", lower):
+        return OwnerIntent("leaderboard")
+    if re.search(r"\bcat\b.*\b(?:meme|reaction|caption)\b|\b(?:send|fetch|show|give)\b.*\bcat\b", lower):
+        return OwnerIntent("cat")
+
     for action in ACTION_WORDS:
         if target_id and re.search(rf"\b{re.escape(action)}\b", lower):
             return OwnerIntent("action_gif", action=action, target_user_id=target_id)
@@ -104,7 +114,8 @@ async def classify_owner_intent(text: str, mentions: list | None = None) -> Owne
             "content": (
                 "Classify the user's Discord message for a butler bot. Return ONLY "
                 "valid JSON with keys: intent, query, action. Valid intents: chat, "
-                "web_search, news, image_search, gif_search, meme, tea, coffee. "
+                "web_search, news, image_search, gif_search, meme, tea, coffee, trivia, cards, leaderboard, cat. "
+                "Use cards for higher-or-lower games, trivia for quizzes, cat for captioned cat reactions. "
                 "Use chat if the user is only conversing. Use web_search for factual "
                 "lookup requests. Use news for news/headline requests."
             ),
@@ -112,17 +123,16 @@ async def classify_owner_intent(text: str, mentions: list | None = None) -> Owne
         {"role": "user", "content": text},
     ]
     raw = await llm.generate_response(prompt, temperature=0.1, max_tokens=160)
-    json_text = raw.strip()
-    if "{" in json_text and "}" in json_text:
-        json_text = json_text[json_text.find("{"):json_text.rfind("}") + 1]
     try:
-        data = json.loads(json_text)
-    except json.JSONDecodeError:
+        data = llm.parse_json(raw)
+        if not isinstance(data, dict):
+            return OwnerIntent("chat")
+    except (ValueError, TypeError):
         return OwnerIntent("chat")
 
     name = str(data.get("intent", "chat")).strip()
     if name not in {
-        "chat", "web_search", "news", "image_search", "gif_search", "meme", "tea", "coffee"
+        "chat", "web_search", "news", "image_search", "gif_search", "meme", "tea", "coffee", "trivia", "cards", "leaderboard", "cat"
     }:
         name = "chat"
     return OwnerIntent(

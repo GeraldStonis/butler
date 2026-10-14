@@ -24,12 +24,18 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         self.interval_patch = patch('config.DEAD_CHAT_IDLE_SECONDS', 60)
         self.path_patch.start()
         self.interval_patch.start()
+        self.gap_patch = patch('config.AUTONOMOUS_MIN_GAP_SECONDS', 0)
+        self.topic_patch = patch('config.ENGAGEMENT_TOPIC_CHANCE', 0)
+        self.gap_patch.start()
+        self.topic_patch.start()
         await db.get_db()
 
     async def asyncTearDown(self):
         await db.close()
         self.path_patch.stop()
         self.interval_patch.stop()
+        self.gap_patch.stop()
+        self.topic_patch.stop()
         self.directory.cleanup()
 
     async def row(self):
@@ -71,7 +77,7 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         channel.send = AsyncMock()
         cog = object.__new__(HousekeepingCog)
         cog.bot = SimpleNamespace(get_channel=lambda _: channel)
-        cog._pick_random_member = lambda _: SimpleNamespace(id=20, mention='<@20>')
+        cog._pick_random_member = AsyncMock(return_value=SimpleNamespace(id=20, mention='<@20>'))
         async def age(seconds):
             await connection.execute("UPDATE channel_activity SET last_channel_message_at=datetime('now', ?) WHERE channel_id=10", (f'-{seconds} seconds',))
             await connection.commit()

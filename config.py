@@ -40,8 +40,8 @@ def _int_list_env(name: str, default: str = "") -> list[int]:
 
 
 # Discord
-DISCORD_TOKEN: str = os.environ["DISCORD_TOKEN"]
-OWNER_ID: int = int(os.environ.get("OWNER_ID", "0"))
+DISCORD_TOKEN: str = os.environ.get("DISCORD_TOKEN", "").strip()
+OWNER_ID: int = int(os.environ.get("OWNER_ID") or "0")
 
 OWNER_ALIASES: list[str] = _list_env(
     "OWNER_ALIASES",
@@ -56,6 +56,9 @@ ENABLE_NATURAL_OWNER_ACTIONS: bool = _bool_env("ENABLE_NATURAL_OWNER_ACTIONS", T
 OLLAMA_HOST: str = os.environ.get("OLLAMA_HOST", "https://ollama.com")
 OLLAMA_API_KEY: str = os.environ.get("OLLAMA_API_KEY", "")
 OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "gpt-oss:120b")
+LLM_TIMEOUT_SECONDS: float = max(5, float(os.environ.get("LLM_TIMEOUT_SECONDS", "45")))
+LLM_MAX_CONCURRENT: int = max(1, int(os.environ.get("LLM_MAX_CONCURRENT", "3")))
+OLLAMA_THINKING_LEVEL: str = os.environ.get("OLLAMA_THINKING_LEVEL", "low").strip()
 
 # Database
 DB_PATH: str = os.environ.get("DB_PATH", "nixi.db")
@@ -63,6 +66,10 @@ DB_PATH: str = os.environ.get("DB_PATH", "nixi.db")
 # Memory tuning
 CONTEXT_WINDOW_SIZE: int = int(os.environ.get("CONTEXT_WINDOW_SIZE", "100"))
 SUMMARY_THRESHOLD: int = int(os.environ.get("SUMMARY_THRESHOLD", "50"))
+CONTEXT_MESSAGE_LIMIT: int = max(4, int(os.environ.get("CONTEXT_MESSAGE_LIMIT", "35")))
+CONTEXT_CHAR_BUDGET: int = max(2000, int(os.environ.get("CONTEXT_CHAR_BUDGET", "10000")))
+FOLLOWUP_WINDOW_SECONDS: int = max(0, int(os.environ.get("FOLLOWUP_WINDOW_SECONDS", "90")))
+OWNER_MENTION_COOLDOWN_SECONDS: int = max(0, int(os.environ.get("OWNER_MENTION_COOLDOWN_SECONDS", "600")))
 
 # Owner-only web/media tools
 TAVILY_API_KEY: str = os.environ.get("TAVILY_API_KEY", "")
@@ -100,6 +107,16 @@ MEME_DROP_CHANNEL_ID: int = int(os.environ.get("MEME_DROP_CHANNEL_ID") or STICKE
 MEME_DROP_INTERVAL_SECONDS: int = max(60, int(os.environ.get("MEME_DROP_INTERVAL_SECONDS", "300")))
 
 # Persona
+ACTIVITIES_ENABLED: bool = _bool_env("ACTIVITIES_ENABLED", True)
+AUTOMATIC_GAME_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("AUTOMATIC_GAME_CHANCE", "0.2"))))
+ENGAGEMENT_TOPIC_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("ENGAGEMENT_TOPIC_CHANCE", "0.35"))))
+AUTONOMOUS_MIN_GAP_SECONDS: int = max(0, int(os.environ.get("AUTONOMOUS_MIN_GAP_SECONDS", "120")))
+QUIET_HOURS: str = os.environ.get("QUIET_HOURS", "").strip()
+SERVER_TIMEZONE: str = os.environ.get("SERVER_TIMEZONE", "Asia/Kolkata")
+MUSIC_DROP_ENABLED: bool = _bool_env("MUSIC_DROP_ENABLED", True)
+MUSIC_CHANNEL_IDS: list[int] = _int_list_env("MUSIC_CHANNEL_IDS") or DEAD_CHAT_CHANNEL_IDS
+SONGS_PATH: Path = Path(os.environ.get("SONGS_PATH", str(Path(__file__).parent / "songs_data.json")))
+
 PERSONA_PATH: Path = Path(__file__).parent / "persona.md"
 
 
@@ -110,3 +127,15 @@ def load_persona() -> str:
 
 # Bot-watching rules
 BOT_RULES_PATH: Path = Path(__file__).parent / "bot_rules.json"
+
+
+def validate_runtime() -> None:
+    missing = []
+    if not DISCORD_TOKEN or DISCORD_TOKEN == "your-bot-token-here":
+        missing.append("DISCORD_TOKEN")
+    if OWNER_ID <= 0:
+        missing.append("OWNER_ID (numeric Discord user ID)")
+    if OLLAMA_HOST.rstrip("/") == "https://ollama.com" and (not OLLAMA_API_KEY or OLLAMA_API_KEY == "your-ollama-api-key"):
+        missing.append("OLLAMA_API_KEY")
+    if missing:
+        raise ValueError("Missing required environment settings: " + ", ".join(missing))

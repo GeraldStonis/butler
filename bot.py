@@ -14,7 +14,7 @@ import discord
 from discord.ext import commands
 
 import config
-from services import database, emoji_filter
+from services import database, emoji_filter, memory
 
 for stream in (sys.stdout, sys.stderr):
     if hasattr(stream, "reconfigure"):
@@ -31,7 +31,7 @@ logging.basicConfig(
 log = logging.getLogger("nixi")
 # Provider API keys can appear in HTTP request query strings.
 logging.getLogger("httpx").setLevel(logging.WARNING)
-_cogs_loaded = False
+_profiles_loaded = False
 
 
 # ── Bot Setup ────────────────────────────────────────────────────────────────
@@ -41,10 +41,20 @@ intents.message_content = True  # Read message text (privileged)
 intents.members = True          # Resolve member info (privileged)
 intents.guilds = True           # Guild/emoji access
 
-bot = commands.Bot(
+class NixiBot(commands.Bot):
+    async def setup_hook(self) -> None:
+        await database.get_db()
+        for cog in ("cogs.activities", "cogs.chat", "cogs.commands", "cogs.watcher", "cogs.housekeeping"):
+            await self.load_extension(cog)
+            log.info("Loaded cog: %s", cog)
+
+
+bot = NixiBot(
     command_prefix="!",
     intents=intents,
     help_command=None,  # We use slash commands; disable default help
+    owner_id=config.OWNER_ID,
+    allowed_mentions=discord.AllowedMentions.none(),
 )
 
 
@@ -74,7 +84,7 @@ async def on_guild_join(guild: discord.Guild) -> None:
 @bot.event
 async def on_ready() -> None:
     """Fires once when the bot has connected and is ready."""
-    global _cogs_loaded
+    global _profiles_loaded
     assert bot.user is not None
     log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     log.info("Nixi is at your service.")
@@ -87,30 +97,16 @@ async def on_ready() -> None:
     await database.get_db()
     log.info("Database initialised at %s", config.DB_PATH)
 
-    for guild in bot.guilds:
-        for member in guild.members:
-            if not member.bot:
-                await database.update_member_profile(guild.id, member.id, member.display_name, member.name)
-
-    for guild in bot.guilds:
-        for member in guild.members:
-            if not member.bot:
-                await database.update_member_profile(guild.id, member.id, member.display_name, member.name)
+    if not _profiles_loaded:
+        for guild in bot.guilds:
+            for member in guild.members:
+                if not member.bot:
+                    await database.update_member_profile(guild.id, member.id, member.display_name, member.name)
+        _profiles_loaded = True
 
     # Cache emoji ownership from audit logs
     await emoji_filter.cache_emojis(bot)
     log.info("Emoji ownership cache updated")
-
-    # Load cogs
-    if not _cogs_loaded:
-        cog_names = ["cogs.chat", "cogs.commands", "cogs.watcher", "cogs.housekeeping"]
-        for cog in cog_names:
-            try:
-                await bot.load_extension(cog)
-                log.info("Loaded cog: %s", cog)
-            except Exception:
-                log.exception("Failed to load cog: %s", cog)
-        _cogs_loaded = True
 
     log.info(
         "Serving in %d guild(s). Awaiting orders.",
@@ -136,26 +132,30 @@ async def on_command_error(
 async def shutdown() -> None:
     """Graceful shutdown: close DB, then the bot."""
     log.info("Shutting down gracefully...")
-    await database.close()
     await bot.close()
+    await memory.shutdown()
+    await database.close()
+
+
+async def run_bot() -> None:
+    config.validate_runtime()
+    try:
+        async with bot:
+            await bot.start(config.DISCORD_TOKEN)
+    finally:
+        await memory.shutdown()
+        await database.close()
 
 
 def main() -> None:
-    """Entry point."""
+    """Keep cleanup on the same event loop as database and background tasks."""
     try:
-        bot.run(config.DISCORD_TOKEN, log_handler=None)
+        asyncio.run(run_bot())
     except KeyboardInterrupt:
         log.info("Interrupted by user")
-    finally:
-        # Ensure DB is closed
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(database.close())
-            else:
-                loop.run_until_complete(database.close())
-        except Exception:
-            pass
+    except ValueError as exc:
+        log.error("Startup configuration error: %s", exc)
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

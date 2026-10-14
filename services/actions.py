@@ -44,6 +44,14 @@ async def execute_owner_intent(
         return False
 
     try:
+        if name == "cat":
+            result = await media.fetch_cat()
+            if result:
+                await message.reply(embed=_media_embed(result), mention_author=False)
+            else:
+                await message.reply("Cat service returned no image. Try again shortly.", mention_author=False)
+            return True
+
         if name == "web_search":
             query = owner_intent.query or message.content
             results = await search.web_search(query, count=6)
@@ -118,6 +126,8 @@ async def execute_owner_intent(
             await message.channel.send(
                 f"{target}, the Young Master has requested a little slapstick diplomacy.",
                 embed=_media_embed(result),
+                allowed_mentions=discord.AllowedMentions(everyone=False, roles=False,
+                    users=[discord.Object(id=owner_intent.target_user_id)] if owner_intent.target_user_id else [], replied_user=False),
             )
             return True
 

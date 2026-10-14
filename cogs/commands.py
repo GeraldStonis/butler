@@ -194,7 +194,7 @@ class CommandsCog(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
         instr_id = await db.save_instruction(instruction)
-        log.info("Owner instruction #%d stored: %.100s", instr_id, instruction)
+        log.info("Owner instruction #%d stored", instr_id)
 
         await interaction.followup.send(
             f"Very good, M'Lord. Instruction noted and shall be observed "
@@ -230,7 +230,8 @@ class CommandsCog(commands.Cog):
                 "content": (
                     "The Young Master has given you a direct command: "
                     f"'{action}'. "
-                    "Fulfill this command immediately, speaking in character. "
+                    "Respond in text only, speaking in character. Never claim a search, media delivery "
+                    "or other external action occurred. Actual errands are requested naturally in chat. "
                     "Output ONLY what you would say in response, with no conversational filler."
                 ),
             },
@@ -240,7 +241,7 @@ class CommandsCog(commands.Cog):
         guild = interaction.guild
         reply = await emoji_filter.filter_response(reply, guild)
 
-        await interaction.followup.send(reply)
+        await interaction.followup.send(reply[:2000] or "No reply available right now.")
         
         # Log to memory so it has context of its own words
         guild_id = interaction.guild.id if interaction.guild else None
@@ -303,8 +304,14 @@ class CommandsCog(commands.Cog):
             return
             
         await interaction.response.defer(ephemeral=True, thinking=True)
+        await memory.cancel_summary(interaction.channel_id)
         async with memory.channel_lock(interaction.channel_id):  # type: ignore[arg-type]
+            memory.invalidate_summary(interaction.channel_id)
             await db.clear_channel_memory(interaction.channel_id)  # type: ignore[arg-type]
+            chat = getattr(self.bot, "get_cog", lambda _: None)("ChatCog")
+            if chat:
+                chat._followups.pop(interaction.channel_id, None)
+                chat._last_guest_retort.pop(interaction.channel_id, None)
         await interaction.followup.send(
             "Recent memory cleared for this channel. Member profiles and standing instructions remain.",
             ephemeral=True,

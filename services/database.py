@@ -9,20 +9,28 @@ and emoji ownership caching.
 from __future__ import annotations
 
 import aiosqlite
+import asyncio
 import config
 
 _db: aiosqlite.Connection | None = None
+_init_lock = asyncio.Lock()
 
 
 async def get_db() -> aiosqlite.Connection:
     """Return the singleton database connection, initialising if needed."""
     global _db
-    if _db is None:
-        _db = await aiosqlite.connect(config.DB_PATH)
-        _db.row_factory = aiosqlite.Row
-        await _db.execute("PRAGMA journal_mode=WAL")
-        await _db.execute("PRAGMA foreign_keys=ON")
-        await _create_tables(_db)
+    async with _init_lock:
+        if _db is None:
+            connection = await aiosqlite.connect(config.DB_PATH)
+            try:
+                connection.row_factory = aiosqlite.Row
+                await connection.execute("PRAGMA journal_mode=WAL")
+                await connection.execute("PRAGMA foreign_keys=ON")
+                await _create_tables(connection)
+            except BaseException:
+                await connection.close()
+                raise
+            _db = connection
     return _db
 
 
@@ -113,10 +121,27 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             value      TEXT NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-        CREATE TABLE IF NOT EXISTS meme_history (
-            content_hash TEXT PRIMARY KEY,
-            image_url TEXT NOT NULL UNIQUE,
-            post_url TEXT UNIQUE,
+        CREATE TABLE IF NOT EXISTS activity_scores (
+            guild_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            game TEXT NOT NULL,
+            score INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (guild_id, user_id, game)
+        );
+        CREATE TABLE IF NOT EXISTS activity_history (
+            item_key TEXT PRIMARY KEY,
+            selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS member_preferences (
+            guild_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            roasting INTEGER NOT NULL DEFAULT 1,
+            media INTEGER NOT NULL DEFAULT 1,
+            pings INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (guild_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS reaction_gif_history (
+            gif_key TEXT PRIMARY KEY,
             selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS meme_history (
@@ -126,23 +151,6 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
-        CREATE TABLE IF NOT EXISTS member_profiles (
-            guild_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            display_name TEXT NOT NULL,
-            username TEXT NOT NULL,
-            PRIMARY KEY (guild_id, user_id)
-        );
-        CREATE TABLE IF NOT EXISTS member_facts (
-            guild_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            fact_key TEXT NOT NULL,
-            content TEXT NOT NULL,
-            evidence TEXT NOT NULL,
-            source TEXT NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (guild_id, user_id, fact_key)
-        );
 
         CREATE TABLE IF NOT EXISTS member_profiles (
             guild_id INTEGER NOT NULL,
@@ -272,6 +280,7 @@ async def get_channel_idle_candidates(
         cursor = await db.execute(
             f"""SELECT channel_id, guild_id, last_user_id, last_message_at,
                        last_dead_ping_at, dead_ping_count, last_message_is_bot,
+                       (julianday('now') - julianday(last_message_at)) * 86400.0 AS human_idle_seconds,
                        (julianday('now') - julianday(COALESCE(last_channel_message_at, last_message_at))) * 86400.0 AS idle_seconds,
                        CASE
                            WHEN last_dead_ping_at IS NULL THEN NULL
@@ -285,6 +294,7 @@ async def get_channel_idle_candidates(
         cursor = await db.execute(
             """SELECT channel_id, guild_id, last_user_id, last_message_at,
                       last_dead_ping_at, dead_ping_count, last_message_is_bot,
+                      (julianday('now') - julianday(last_message_at)) * 86400.0 AS human_idle_seconds,
                       (julianday('now') - julianday(COALESCE(last_channel_message_at, last_message_at))) * 86400.0 AS idle_seconds,
                       CASE
                           WHEN last_dead_ping_at IS NULL THEN NULL
@@ -321,24 +331,15 @@ async def get_state(key: str) -> str | None:
     return row["value"] if row else None
 
 
-async def meme_is_known(image_url: str, post_url: str | None) -> bool:
-    db = await get_db()
-    cursor = await db.execute(
-        """SELECT 1 FROM meme_history WHERE image_url=? OR post_url=?
-           UNION ALL SELECT 1 FROM bot_state
-           WHERE key LIKE 'meme_drop_last:%' AND value=? LIMIT 1""",
-        (image_url, post_url, image_url),
-    )
-    return await cursor.fetchone() is not None
 
 
-async def claim_meme(content_hash: str, image_url: str, post_url: str | None) -> bool:
-    """Atomically reserve a new image across all meme delivery paths."""
+
+
+
+
+async def claim_reaction_gif(gif_key: str) -> bool:
     db = await get_db()
-    cursor = await db.execute(
-        "INSERT OR IGNORE INTO meme_history (content_hash, image_url, post_url) VALUES (?, ?, ?)",
-        (content_hash, image_url, post_url),
-    )
+    cursor = await db.execute("INSERT OR IGNORE INTO reaction_gif_history (gif_key) VALUES (?)", (gif_key,))
     await db.commit()
     return cursor.rowcount == 1
 
@@ -379,6 +380,60 @@ async def set_state(key: str, value: str) -> None:
     await db.commit()
 
 
+async def claim_activity(item_key: str) -> bool:
+    connection = await get_db()
+    cursor = await connection.execute("INSERT OR IGNORE INTO activity_history (item_key) VALUES (?)", (item_key,))
+    await connection.commit()
+    return cursor.rowcount == 1
+
+
+async def add_activity_score(guild_id: int, user_id: int, game: str, points: int = 1) -> None:
+    connection = await get_db()
+    await connection.execute(
+        """INSERT INTO activity_scores VALUES (?, ?, ?, ?)
+           ON CONFLICT(guild_id, user_id, game) DO UPDATE SET score=score+excluded.score""",
+        (guild_id, user_id, game, points),
+    )
+    await connection.commit()
+
+
+async def activity_leaderboard(guild_id: int) -> list[dict]:
+    connection = await get_db()
+    cursor = await connection.execute(
+        """SELECT user_id, SUM(score) AS score FROM activity_scores
+           WHERE guild_id=? GROUP BY user_id ORDER BY score DESC, user_id LIMIT 10""", (guild_id,)
+    )
+    return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_member_preferences(guild_id: int, user_id: int) -> dict[str, bool]:
+    connection = await get_db()
+    cursor = await connection.execute("SELECT roasting, media, pings FROM member_preferences WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+    row = await cursor.fetchone()
+    return {key: bool(row[key]) if row else True for key in ("roasting", "media", "pings")}
+
+
+async def set_member_preferences(guild_id: int, user_id: int, updates: dict[str, bool]) -> None:
+    connection = await get_db()
+    await connection.execute("INSERT OR IGNORE INTO member_preferences (guild_id,user_id) VALUES (?,?)", (guild_id, user_id))
+    for key, value in updates.items():
+        if key in {"roasting", "media", "pings"} and isinstance(value, bool):
+            await connection.execute(f"UPDATE member_preferences SET {key}=? WHERE guild_id=? AND user_id=?", (int(value), guild_id, user_id))
+    await connection.commit()
+
+
+async def recent_channel_members(channel_id: int) -> list[int]:
+    connection = await get_db()
+    cursor = await connection.execute(
+        """SELECT a.user_id FROM user_activity a LEFT JOIN member_preferences p
+           ON p.guild_id=a.guild_id AND p.user_id=a.user_id
+           WHERE a.channel_id=? AND a.last_message_at >= datetime('now','-7 days')
+           AND COALESCE(p.pings,1)=1 AND COALESCE(p.roasting,1)=1
+           ORDER BY a.last_message_at DESC LIMIT 30""", (channel_id,)
+    )
+    return [row['user_id'] for row in await cursor.fetchall()]
+
+
 async def get_recent_messages(
     channel_id: int, limit: int | None = None
 ) -> list[dict]:
@@ -389,7 +444,7 @@ async def get_recent_messages(
         """SELECT author_id, author_name, is_bot, content, created_at
            FROM messages
            WHERE channel_id = ?
-           ORDER BY created_at DESC
+           ORDER BY id DESC
            LIMIT ?""",
         (channel_id, limit),
     )
@@ -424,7 +479,7 @@ async def get_oldest_messages(channel_id: int, limit: int) -> list[dict]:
         """SELECT id, author_name, is_bot, content, created_at
            FROM messages
            WHERE channel_id = ?
-           ORDER BY created_at ASC
+           ORDER BY id ASC
            LIMIT ?""",
         (channel_id, limit),
     )
@@ -485,40 +540,10 @@ async def clear_channel_memory(channel_id: int) -> None:
     await db.commit()
 
 
-async def update_member_profile(guild_id: int, user_id: int, display_name: str, username: str) -> None:
-    db = await get_db()
-    await db.execute(
-        """INSERT INTO member_profiles VALUES (?, ?, ?, ?)
-           ON CONFLICT(guild_id, user_id) DO UPDATE SET
-           display_name=excluded.display_name, username=excluded.username""",
-        (guild_id, user_id, display_name, username),
-    )
-    await db.commit()
 
 
-async def save_member_fact(guild_id: int, user_id: int, fact_key: str, content: str, evidence: str, source: str = "self_report") -> None:
-    db = await get_db()
-    # An owner-curated note cannot be overwritten by automatic extraction.
-    await db.execute(
-        """INSERT INTO member_facts (guild_id, user_id, fact_key, content, evidence, source)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON CONFLICT(guild_id, user_id, fact_key) DO UPDATE SET
-           content=excluded.content, evidence=excluded.evidence, source=excluded.source,
-           updated_at=CURRENT_TIMESTAMP
-           WHERE member_facts.source != 'owner_note' OR excluded.source = 'owner_note'""",
-        (guild_id, user_id, fact_key, content[:400], evidence[:1000], source),
-    )
-    await db.commit()
 
 
-async def get_member_facts(guild_id: int, user_id: int, limit: int = 12) -> list[dict]:
-    db = await get_db()
-    cursor = await db.execute(
-        """SELECT fact_key, content, evidence, source FROM member_facts
-           WHERE guild_id=? AND user_id=? ORDER BY updated_at DESC LIMIT ?""",
-        (guild_id, user_id, limit),
-    )
-    return [dict(row) for row in await cursor.fetchall()]
 
 
 async def update_member_profile(guild_id: int, user_id: int, display_name: str, username: str) -> None:

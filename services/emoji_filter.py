@@ -31,12 +31,14 @@ async def cache_emojis(bot: Bot) -> None:
     log.info("Total custom emojis across all guilds: %d", total)
 
 
-def get_emoji_context(guild: discord.Guild | None) -> str | None:
+def get_emoji_context(guild: discord.Guild | None, current_message: str = "") -> str | None:
     """Build a system-prompt block listing custom emojis in the guild."""
     if not guild or not guild.emojis:
         return None
 
-    emoji_list = ", ".join(f":{e.name}:" for e in guild.emojis)
+    words = set(re.findall(r"\w+", current_message.lower()))
+    available = sorted(guild.emojis, key=lambda e: not any(word in e.name.casefold() for word in words if len(word) > 2))
+    emoji_list = ", ".join(f":{e.name}:" for e in available[:50])
     return (
         "EMOJI GUIDANCE:\n"
         "The following custom emojis are available in this Discord server. "

@@ -179,7 +179,8 @@ class WatcherCog(commands.Cog):
                 channel = self.bot.get_channel(self.alert_channel_id)
                 if channel and isinstance(channel, discord.TextChannel):
                     owner_mention = f"<@{config.OWNER_ID}>"
-                    await channel.send(f"{owner_mention} {full_alert}")
+                    await channel.send(f"{owner_mention} {full_alert}", allowed_mentions=discord.AllowedMentions(
+                        everyone=False, roles=False, users=[discord.Object(id=config.OWNER_ID)], replied_user=False))
                     log.info("Alert sent to channel: %.80s", alert_text)
         except discord.Forbidden:
             log.warning("Cannot send alert — missing permissions")

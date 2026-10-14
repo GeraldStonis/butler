@@ -1,10 +1,10 @@
 import asyncio
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import config
-from services import database as db, media
+from services import database as db, media, generated_memes
 
 
 class MemeUniquenessTests(unittest.IsolatedAsyncioTestCase):
@@ -30,29 +30,29 @@ class MemeUniquenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(await db.claim_meme('other', row['image_url'], None))
         self.assertFalse(await db.claim_meme('another', 'https://images.test/3.jpg', row['post_url']))
 
-    async def test_batch_skips_same_image_under_different_urls(self):
-        original = [{'title': 'First', 'url': 'https://images.test/first.jpg?size=1', 'postLink': 'https://posts.test/first'}]
-        batch = original
-        images = {'/first.jpg': b'original image bytes', '/repost.jpg': b'original image bytes', '/new.jpg': b'new image bytes'}
-        requests = []
+    async def test_generated_captions_and_rendered_bytes_are_unique(self):
+        import json
+        renders = []
         def respond(request):
-            requests.append(str(request.url))
-            if request.url.host == 'meme-api.com':
-                return httpx.Response(200, json={'memes': batch})
-            return httpx.Response(200, headers={'content-type': 'image/jpeg'}, content=images[request.url.path])
+            if request.url.path == '/templates/':
+                return httpx.Response(200, json=[{'id': 'buzz', 'name': 'Buzz', 'lines': 2}])
+            if request.method == 'POST':
+                payload = json.loads(request.content)
+                renders.append(payload['text'])
+                return httpx.Response(201, json={'url': f'https://api.memegen.link/images/{len(renders)}.png'})
+            content = b'same pixels' if len(renders) <= 2 else b'fresh pixels'
+            return httpx.Response(200, headers={'content-type': 'image/png'}, content=content)
+        responses = [json.dumps({'template_id': 'buzz', 'text': text}) for text in (
+            ['Tabs', 'Tabs everywhere'], ['Tabs', 'Tabs everywhere'],
+            ['Meetings', 'More meetings'], ['Gaming', 'One more round'],
+        )]
         real_client = httpx.AsyncClient
-        with patch.object(media.httpx, 'AsyncClient', side_effect=lambda **kw: real_client(transport=httpx.MockTransport(respond), **kw)), patch.object(media.random, 'shuffle', lambda _: None):
+        with patch.object(generated_memes, '_templates', []), patch.object(generated_memes.httpx, 'AsyncClient', side_effect=lambda **kw: real_client(transport=httpx.MockTransport(respond), **kw)), patch.object(generated_memes.llm, 'generate_response', AsyncMock(side_effect=responses)):
             first = await media.fetch_meme()
-            self.assertEqual(first.title, 'First')
-            batch = [
-                {'title': 'URL duplicate', 'url': 'https://images.test/first.jpg?size=2', 'postLink': 'https://posts.test/other'},
-                {'title': 'Repost duplicate', 'url': 'https://images.test/repost.jpg', 'postLink': 'https://posts.test/repost'},
-                {'title': 'Fresh', 'url': 'https://images.test/new.jpg', 'postLink': 'https://posts.test/new'},
-            ]
             second = await media.fetch_meme()
-            self.assertEqual(second.title, 'Fresh')
-            self.assertNotIn('https://images.test/first.jpg?size=2', requests)
-            self.assertIsNone(await media.fetch_meme())
+        self.assertEqual(first.title, 'Tabs / Tabs everywhere')
+        self.assertEqual(second.title, 'Gaming / One more round')
+        self.assertEqual(len(renders), 3)  # repeated caption skipped before rendering
 
     async def test_legacy_last_drop_and_history_survive_connection_restart(self):
         # File persistence is covered by the existing database tests; reconnect

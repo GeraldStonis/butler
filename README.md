@@ -14,6 +14,12 @@ The key design rule is simple:
 ## Current Features
 
 - Natural conversation when mentioned, replied to, or DM'd.
+- Short, same-person follow-ups continue for up to 90 seconds without another
+  mention, limited to two follow-ups. Another speaker breaks that continuation.
+- A shorter persona, bounded recent context, and one regeneration for near-duplicate
+  casual replies reduce recycled lines. Serious questions and explanations keep their
+  substance instead of being rewritten merely for novelty. No guarantee that a model
+  will never repeat itself, but repeated output is now checked, not just discouraged.
 - Owner-only natural language actions:
   - "nixi get me the morning news"
   - "nixi search latest cybersecurity news"
@@ -32,20 +38,28 @@ The key design rule is simple:
   sends the same server's available `kidhar chali` sticker in that channel.
   Spaces, underscores, hyphens, and capitalization in the sticker name are ignored.
 - Random meme drops every 4-6 minutes by default, independently of chat replies.
-  All meme paths share a persistent SQLite history: post/image URL duplicates
+  Memes now use [memegen.link](https://api.memegen.link/docs/), with fresh LLM-written
+  captions instead of the repeated Reddit random feed. All meme paths share a
+  persistent SQLite history: normalized caption duplicates, image URL duplicates
   and identical image bytes are rejected. Candidates are reserved atomically,
   so concurrent requests do not reuse them. No new candidate means no rerun.
-  Image-byte checks are bounded to 8 MB and a 20-second overall search budget.
+  Image-byte checks are bounded to 8 MB and a 60-second overall generation budget.
   `MEME_DROP_ENABLED` defaults to true, `MEME_DROP_INTERVAL_SECONDS` to 300;
   `MEME_DROP_CHANNEL_ID` defaults to the configured sticker/spam channel.
   The first drop waits one interval, and the next scheduled time survives restarts.
 - Rolling channel memory, summaries, long-term memories, and owner instructions.
 - Server emoji support without forcing an emoji into every reply.
-- Automatic contextual GIF/meme reactions accompany Nixi's own replies.
+- Automatic contextual GIF/meme/captioned-cat reactions accompany Nixi's own replies.
   Defaults: enabled, 95% sampling, 45 seconds between attempts per channel.
   The selector may choose no media; memes are checked for relevance by title.
-  Roast reactions include side-eye, smug, mic-drop, and facepalm GIFs. The LLM
-  can choose an embed-only reply when the GIF itself is the punchline.
+  The LLM infers its reply's sentiment and comic intent, then generates specific
+  GIF search phrases rather than choosing fixed reaction queries. It avoids
+  recent queries; automatic searches skip GIF IDs already selected in SQLite,
+  including across restarts. Empty/repeated results trigger a fresh search phrase.
+  Automatic searches also try up to three ranked result pages when earlier pages
+  have been exhausted. Direct owner requests keep the first-result behavior.
+  Automatic media gets 12 seconds; if delayed, Nixi sends the text without it.
+  The LLM can choose an embed-only reply when the GIF itself is the punchline.
 - Bot watcher rules for alerts from other bots.
 
 ## Member Memory And Resets
@@ -63,7 +77,20 @@ requires a supporting quote, and replaces older values for the same topic.
 It does not scan old server history or import ambiguous legacy conversation facts.
 The existing owner-only `/restart` also resets the current channel's recent memory.
 
+Members can set their own comfort boundaries naturally: "nixi don't roast me",
+"nixi stop pinging me", or "nixi don't send me gifs". These are personal preferences,
+not permission to command errands. They persist by server and Discord user ID.
+"You can roast me again" or "gifs for me are okay again" re-enables that preference.
+They survive recent-memory resets. Owner/private notes are not loaded into guest
+conversations, and other bots' messages are never attributed to Nixi.
+
+Human activity is recorded before waiting for an in-progress reply. Memory
+summarization runs as a tracked background task; a failed summary does not delete
+the evidence. Resets cancel pending summaries before clearing the channel.
+
 ## Setup
+
+Requires Python 3.11 or newer.
 
 Install dependencies:
 
@@ -141,6 +168,19 @@ guest-command refusals are generated afresh by the LLM, using stored lines only
 as examples and avoiding the previous reply. Generation failure skips the reply
 instead of selecting a canned fallback.
 
+By default, 35% of non-game revival attempts become a newly generated, unmentioned
+conversation opener rather than another demand to talk. These can be a harmless
+hot take, this-or-that choice, or a curious question. They count toward the same
+five-nudge cap and exponential schedule. Roast pings choose recent participants,
+respect opt-outs, and avoid the previous target; with no suitable target Nixi
+opens a topic without pinging anyone. Unsolicited memes, music, and nudges share
+a two-minute channel cooldown, so they do not arrive in a burst. Provider failures
+back off instead of repeatedly generating a nudge every 15 seconds.
+
+Optional `QUIET_HOURS=23:00-08:00` uses `SERVER_TIMEZONE` (default Asia/Kolkata)
+and suppresses routine unsolicited posts, including sticker spam. Owner requests
+and normal conversations remain available. A blank value disables quiet hours.
+
 `DEAD_CHAT_CHANNEL_IDS` may be left empty to consider channels Nixi has seen
 activity in, or set to comma-separated channel IDs.
 
@@ -167,6 +207,46 @@ services/database.py    SQLite persistence
 services/emoji_filter.py Emoji cleanup and mention resolution
 ```
 
+## Games And Rare Music
+
+Ask naturally as Ronix: "nixi start trivia", "nixi play higher or lower",
+"nixi show the leaderboard", or "nixi send a cat meme". No new slash commands.
+Everyone can answer game buttons, once per round. Scores persist in SQLite.
+Trivia is supplied by [Open Trivia DB](https://opentdb.com/api_config.php), with
+decoded text, batch caching, rate limiting and a persistent no-repeat question ledger.
+Higher-or-lower uses [Deck of Cards](https://deckofcardsapi.com/), five 60-second
+rounds, ace high, and no points for ties. A game ends early if nobody participates.
+Only one game runs per channel; inactive buttons close even if users keep clicking.
+Nixi has a 20% chance to replace the first dead-chat nudge with a game; it counts
+toward the existing five-nudge limit. Other nudges mix roasts and conversation openers.
+Captioned reactions use [Cataas](https://cataas.com/). Meme and cat captions are
+invented independently: no server conversation is sent to these image APIs.
+The new public APIs need no extra keys; caption writing uses the existing LLM.
+
+Music uses your `songs_data.json` playlist (`songs.json` is accepted as a fallback).
+Video IDs are validated and duplicate playlist entries are collapsed. Once a channel
+has had no human activity for a randomly chosen 10-15 minutes, Nixi gets exactly
+one 10% chance to post a song. It does not reroll every timer tick. Human messages
+and game participation reset the quiet spell; bot posts do not. The decision and
+recent songs survive restarts. Active games suppress music drops.
+The announcement is generated afresh, followed by a YouTube URL for Discord's
+native playable preview. This is an explicit exception to the usual no-links policy;
+playback/embedding still depends on Discord settings and the video's availability.
+No voice-channel playback is involved.
+
+```env
+ACTIVITIES_ENABLED=true
+AUTOMATIC_GAME_CHANCE=0.2
+MUSIC_DROP_ENABLED=true
+MUSIC_CHANNEL_IDS=your-chat-channel-id
+SONGS_PATH=songs_data.json
+```
+
+If `MUSIC_CHANNEL_IDS` is blank, it uses `DEAD_CHAT_CHANNEL_IDS`. If both are blank,
+automatic music stays inactive. Ensure Nixi has Send Messages and Embed Links
+permissions. Commit the new files, including the playlist, and redeploy Railway.
+Keep a single bot worker; game buttons are intentionally not resumed after a restart.
+
 ## Deployment
 
 Railway can run this as a worker using the included `Procfile` or
@@ -175,3 +255,26 @@ Railway can run this as a worker using the included `Procfile` or
 ```env
 DB_PATH=/data/nixi.db
 ```
+
+New settings have defaults; do not replace your existing Railway variables or
+check `.env` into Git. The new preference table is created automatically in the
+existing database. Upgrade dependencies during redeployment (`ollama>=0.6.2`).
+
+## Model Tuning And Checks
+
+GPT-OSS 120B remains the default. `OLLAMA_THINKING_LEVEL=low` uses its named
+[thinking control](https://docs.ollama.com/capabilities/thinking); blank uses the
+model default. Calls have a 45-second total deadline and three-request concurrency
+limit. Empty final answers get at most one larger-budget retry. Reasoning traces
+and accidental speaker envelopes are not sent to Discord. Ollama Cloud currently
+does not support [schema-enforced output](https://docs.ollama.com/capabilities/structured-outputs),
+so JSON is parsed and checked locally rather than enabling an unsupported format.
+
+```bash
+python -m unittest discover -s tests -q
+python persona_probe.py --live
+```
+
+The probe opts into real LLM requests using synthetic dialogue and a temporary
+database. It does not read server history, modify your normal database, or post
+anything to Discord. Review its answers after future persona/model changes.
