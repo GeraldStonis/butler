@@ -7,7 +7,7 @@ import logging
 import discord
 
 import config
-from services import intent, media, search, memory
+from services import intent, media, search, memory, avatar_edits
 from services.response_text import filter_links, requests_links
 
 log = logging.getLogger("nixi.actions")
@@ -44,6 +44,39 @@ async def execute_owner_intent(
         return False
 
     try:
+        if name == "avatar_edit":
+            if not message.guild:
+                await message.reply("Avatar caricatures are available in server chat only.", mention_author=False)
+                return True
+            member_id = owner_intent.target_user_id or message.author.id
+            member = message.guild.get_member(member_id)
+            if member is None or member.bot:
+                await message.reply("Choose a member of this server for the caricature.", mention_author=False)
+                return True
+            if not await avatar_edits.permitted(message.guild.id, member.id):
+                await message.reply("That member has disabled avatar edits, roasting, or media.", mention_author=False)
+                return True
+            if not avatar_edits.ready():
+                await message.reply("Avatar editing needs its Cloudflare configuration enabled before I can render an image.", mention_author=False)
+                return True
+            scene = owner_intent.action
+            if owner_intent.query or scene not in avatar_edits.SCENES:
+                scene = await avatar_edits.prepare_owner_scene(owner_intent.query or message.content)
+                if scene is None:
+                    await message.reply("I couldn't prepare that as a nonsexual, all-ages cartoon scene. No image was generated.", mention_author=False)
+                    return True
+            image = await avatar_edits.generate(message.guild.id, member, scene, owner_requested=True)
+            if image:
+                sent = await avatar_edits.send_reply(message, image, target_member_id=member.id)
+                if sent is not None:
+                    await memory.log_message(message.channel.id, message.guild.id, sent.author.id,
+                                             "Nixi", f"[AI-edited avatar caricature delivered for member ID {member.id}]", is_bot=True)
+                else:
+                    await message.reply("The image wasn't delivered: preferences may have changed, or Discord rejected the attachment. Check Attach Files and Embed Links permissions.", mention_author=False)
+            else:
+                await message.reply("Avatar editing is unavailable, cooling down, or out of budget. No image was posted.", mention_author=False)
+            return True
+
         if name == "cat":
             result = await media.fetch_cat()
             if result:

@@ -81,6 +81,15 @@ AUTOMATIC_MEDIA_ENABLED: bool = _bool_env("AUTOMATIC_MEDIA_ENABLED", True)
 AUTOMATIC_MEDIA_COOLDOWN_SECONDS: int = max(0, int(os.environ.get("AUTOMATIC_MEDIA_COOLDOWN_SECONDS", "45")))
 AUTOMATIC_MEDIA_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("AUTOMATIC_MEDIA_CHANCE", "0.95"))))
 
+# Optional Cloudflare avatar edits; enabled for members unless they opt out.
+CLOUDFLARE_ACCOUNT_ID: str = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
+CLOUDFLARE_API_TOKEN: str = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+AVATAR_EDITS_ENABLED: bool = _bool_env("AVATAR_EDITS_ENABLED", True)
+AVATAR_EDIT_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("AVATAR_EDIT_CHANCE", "0.2"))))
+AVATAR_EDIT_COOLDOWN_SECONDS: int = max(60, int(os.environ.get("AVATAR_EDIT_COOLDOWN_SECONDS", "3600")))
+AVATAR_EDIT_DAILY_LIMIT: int = max(0, int(os.environ.get("AVATAR_EDIT_DAILY_LIMIT", "10")))
+AVATAR_EDIT_TIMEOUT_SECONDS: float = max(5, min(60, float(os.environ.get("AVATAR_EDIT_TIMEOUT_SECONDS", "30"))))
+
 # Morning news
 MORNING_NEWS_ENABLED: bool = _bool_env("MORNING_NEWS_ENABLED", False)
 MORNING_NEWS_CHANNEL_ID: int = int(os.environ.get("MORNING_NEWS_CHANNEL_ID", "0") or "0")

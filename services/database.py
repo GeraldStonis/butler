@@ -138,6 +138,7 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             roasting INTEGER NOT NULL DEFAULT 1,
             media INTEGER NOT NULL DEFAULT 1,
             pings INTEGER NOT NULL DEFAULT 1,
+            avatar_edits INTEGER NOT NULL DEFAULT 1,
             PRIMARY KEY (guild_id, user_id)
         );
         CREATE TABLE IF NOT EXISTS reaction_gif_history (
@@ -179,6 +180,9 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
     ):
         if name not in columns:
             await db.execute(f"ALTER TABLE channel_activity ADD COLUMN {name} {definition}")
+    cursor = await db.execute("PRAGMA table_info(member_preferences)")
+    if "avatar_edits" not in {row["name"] for row in await cursor.fetchall()}:
+        await db.execute("ALTER TABLE member_preferences ADD COLUMN avatar_edits INTEGER NOT NULL DEFAULT 1")
     await db.commit()
 
 
@@ -408,16 +412,17 @@ async def activity_leaderboard(guild_id: int) -> list[dict]:
 
 async def get_member_preferences(guild_id: int, user_id: int) -> dict[str, bool]:
     connection = await get_db()
-    cursor = await connection.execute("SELECT roasting, media, pings FROM member_preferences WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+    cursor = await connection.execute("SELECT roasting, media, pings, avatar_edits FROM member_preferences WHERE guild_id=? AND user_id=?", (guild_id, user_id))
     row = await cursor.fetchone()
-    return {key: bool(row[key]) if row else True for key in ("roasting", "media", "pings")}
+    return {key: bool(row[key]) if row else True for key in ("roasting", "media", "pings", "avatar_edits")}
 
 
 async def set_member_preferences(guild_id: int, user_id: int, updates: dict[str, bool]) -> None:
     connection = await get_db()
-    await connection.execute("INSERT OR IGNORE INTO member_preferences (guild_id,user_id) VALUES (?,?)", (guild_id, user_id))
+    # Specify the default explicitly: older databases may still declare DEFAULT 0.
+    await connection.execute("INSERT OR IGNORE INTO member_preferences (guild_id,user_id,avatar_edits) VALUES (?,?,1)", (guild_id, user_id))
     for key, value in updates.items():
-        if key in {"roasting", "media", "pings"} and isinstance(value, bool):
+        if key in {"roasting", "media", "pings", "avatar_edits"} and isinstance(value, bool):
             await connection.execute(f"UPDATE member_preferences SET {key}=? WHERE guild_id=? AND user_id=?", (int(value), guild_id, user_id))
     await connection.commit()
 

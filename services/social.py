@@ -42,6 +42,12 @@ def preference_updates(content: str) -> dict[str, bool]:
     }.items():
         if re.search(pattern, text):
             updates[key] = True
+    # Member overrides are literal self-directed statements, never model inferences.
+    avatar_text = re.sub(r"<@!?\d+>|\b(?:nixi|nixon|butler)\b", "", text).strip(" ,:!.")
+    if re.fullmatch(r"(?:please )?(?:stop|do not|dont|never) (?:edit(?:ing)?|roast(?:ing)?|chang(?:e|ing)) my (?:avatar|pfp|profile picture)", avatar_text):
+        updates["avatar_edits"] = False
+    elif re.fullmatch(r"(?:you can (?:edit|roast) my (?:avatar|pfp|profile picture)(?: for fun)?|avatar edits for me are (?:okay|ok)(?: again)?|i opt in to avatar edits)", avatar_text):
+        updates["avatar_edits"] = True
     return updates
 
 
@@ -51,7 +57,7 @@ def guest_kind_hint(content: str) -> str | None:
         return "banter"
     if re.match(r"(?:what (?:does|is)|define|explain)\b", text) and not re.search(r"\b(?:then|and)\s+(?:say|repeat|type|write|send)\b", text):
         return "question"
-    verbs = r"say|repeat|type|reply|respond|send|fetch|get|share|post|show|write|translate|sing|chant|act|pretend|become|ignore|obey|forget|reset|ping|punch|slap|hug|serve|bring|make"
+    verbs = r"say|repeat|type|reply|respond|send|fetch|get|share|post|show|write|translate|sing|chant|act|pretend|become|ignore|obey|forget|reset|ping|punch|slap|hug|serve|bring|make|edit|dress"
     if re.search(rf"(?:^|[.!?;]\s*|\band\s+)(?:(?:please|just|now)\s+)*(?:(?:can|could|would|will)\s+you\s+)?(?:{verbs})\b", text):
         return "command"
     if re.search(r"\b(?:you must|you have to|i order you|from now on|your (?:new )?(?:master|owner) is)\b", text):
@@ -107,7 +113,7 @@ GUEST_RETORT_EXAMPLES = (
 
 async def generate_guest_retort(content: str, previous: str | None = None) -> str:
     for _ in range(2):
-        reply = await llm.generate_response([
+        reply = await llm.generate_visible_response([
             {"role": "system", "content": config.load_persona()},
             {"role": "system", "content": (
                 "Write a NEW sassy refusal to this ordinary guest's command. Sir Ronix is "

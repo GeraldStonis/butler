@@ -3,6 +3,9 @@
 Nixi is a persona-driven Discord bot that acts as a private butler for the
 owner and a conversational character for everyone else.
 
+For a beginner-friendly explanation of the architecture, every feature, and the
+engineering tradeoffs, read the [project walkthrough](PROJECT_WALKTHROUGH.md).
+
 The key design rule is simple:
 
 - Everyone can chat with Nixi when they address him.
@@ -27,6 +30,8 @@ The key design rule is simple:
   - "nixi send coffee"
   - "nixi find an image of ..."
   - "nixi punch @user"
+  - "nixi edit @user's avatar into a maid outfit"
+  - "hey nixi can you make @user eat grass in a field"
 - Owner availability handling:
   - If someone mentions the owner while the owner has been inactive for more
     than `OWNER_AWAY_AFTER_SECONDS`, Nixi replies that the owner is unavailable.
@@ -63,6 +68,99 @@ The key design rule is simple:
   Automatic media gets 12 seconds; if delayed, Nixi sends the text without it.
   The LLM can choose an embed-only reply when the GIF itself is the punchline.
 - Bot watcher rules for alerts from other bots.
+- Optional Cloudflare cartoon-avatar comebacks, enabled for members unless they
+  opt out, plus owner-requested edits. Images never change actual profiles.
+
+## Language And Tone
+
+Nixi speaks English, Hinglish, or Bhojpuri using Latin/Roman letters, even when
+the input uses Devanagari. Emojis, Discord tokens, URLs, technical code, and
+delimited mathematical notation are preserved. Visible generated text gets one
+script-repair pass if it slips into another writing system; a failed repair
+does not publish the original draft. Internal classifier/memory JSON is not
+run through the conversational style policy.
+
+The persona mirrors the current speaker's language, rhythm, formality, and slang,
+including natural AAVE-influenced phrasing when it fits. It does not infer a
+member's identity or turn tone matching into permission to execute guest orders.
+Slang calibration examples include terms documented by
+[Oxford Languages](https://corp.oup.com/word-of-the-year/), but they are not canned
+replies or a live trend feed. New usage comes from the conversation; the bot is
+instructed not to invent meanings or force slang into serious answers.
+
+No new API keys or variables are required. Push the updated code and redeploy
+Railway for the application-level reply checks to take effect.
+
+## Avatar Caricatures
+
+Cloudflare Workers AI's FLUX.2 klein 4B edits a static 256px Discord avatar into
+an obviously fictional, fully clothed cartoon. Automatic comebacks choose from
+a modest maid outfit, donkey ride, tiny throne, or clown costume. Ronix can
+request other playful scenes naturally, such as `hey nixi can you make @user
+eat grass in a field`. GPT-OSS prepares a bounded visual description preserving
+the requested action and setting; Python resolves the actual Discord mention.
+The result is attached with a tag for that member, not a visible image URL.
+Only the target can be notified, and their no-pings preference suppresses that
+notification without removing the visible tag. See the
+[multipart image-editing documentation](https://developers.cloudflare.com/changelog/post/2026-01-15-flux-2-klein-4b-workers-ai/).
+
+No enrollment is needed: avatar edits are enabled for members by default.
+Members can disable them with `nixi stop editing my avatar`, and reenable them
+with `nixi you can edit my avatar` or `nixi avatar edits for me are okay`.
+These preferences are server/user-specific and survive recent-memory resets.
+Existing saved disabled settings are preserved. No-roasting and no-media
+preferences block edits too, including owner requests. Only the configured
+`OWNER_ID` can direct an edit; calling oneself "Ronix" or "master" grants no
+authority. Let server members know that this feature uploads avatars to
+Cloudflare for processing.
+
+Nixi may choose a caricature during repeated playful provocation. It considers
+up to three of that speaker's messages from the last twelve channel messages,
+requires at least two observed messages, and samples 20% of otherwise eligible
+exchanges before asking the LLM whether an edit is appropriate. The model can
+decline; ordinary questions, serious situations, and real hostility should not
+trigger edits. Ronix is excluded from automatic edits, but can request edits of
+his own avatar too.
+
+Configure the following in local `.env` and separately in Railway Variables:
+
+```env
+CLOUDFLARE_ACCOUNT_ID=your_32_character_account_id
+CLOUDFLARE_API_TOKEN=your_new_workers_ai_token
+AVATAR_EDITS_ENABLED=true
+AVATAR_EDIT_CHANCE=0.2
+AVATAR_EDIT_COOLDOWN_SECONDS=3600
+AVATAR_EDIT_DAILY_LIMIT=10
+AVATAR_EDIT_TIMEOUT_SECONDS=30
+```
+
+Create a token with Workers AI Read/Edit permissions using Cloudflare's
+[REST setup guide](https://developers.cloudflare.com/workers-ai/get-started/rest-api/).
+Never commit the real token or post it in chat; rotate any exposed token.
+Missing credentials leave this optional feature inactive without stopping Nixi.
+Grant Nixi **Attach Files** and **Embed Links** in the target channels.
+
+Automatic edits default to one attempt per server/member per hour. Verified
+owner requests bypass that automatic cooldown, but all edits share the limit
+of ten attempts per bot database per UTC day. These are application limits, not
+a billing guarantee: Cloudflare account usage by other applications still counts.
+Attempts
+are reserved before inference, including failures/cancellations; no automatic
+image retries are made. Authentication/quota errors pause provider attempts for
+an hour. Cooldowns and counts persist across restarts. Generation is serialized
+within the single worker and takes at most 30 seconds; automatic selection plus
+generation has a 35-second outer budget.
+
+Only the avatar and a prepared cartoon scene prompt go to Cloudflare, not raw
+chat or usernames. Owner scene preparation uses the text model; automatic
+comebacks use the preset scene descriptions. Results have bounded sizes, are
+kept in memory for delivery, and are labeled as AI-edited caricatures.
+Avatar uploads require HTTPS Discord CDN URLs
+with no redirects. Ordinary conversation falls back to text/GIFs if generation
+fails; rejected Discord attachments fall back to text without claiming an image
+was delivered. Avatar comebacks are conversational replies, not unattended
+nighttime spam. `AUTOMATIC_MEDIA_ENABLED=false` disables automatic avatar
+comebacks too; owner requests use the separate avatar feature flag.
 
 ## Member Memory And Resets
 

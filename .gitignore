@@ -8,3 +8,4 @@ venv/
 *.log
 *.db-wal
 *.db-shm
+PROJECT_WALKTHROUGH.md

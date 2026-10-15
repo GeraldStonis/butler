@@ -67,7 +67,7 @@ def dead_chat_due(row: dict) -> bool:
 
 async def generate_dead_chat_line(previous: str | None, count: int) -> str:
     for _ in range(2):
-        text = await llm.generate_response([
+        text = await llm.generate_visible_response([
             {"role": "system", "content": config.load_persona()},
             {"role": "system", "content": (
                 "Generate a NEW playful roast inviting a quiet Discord chat to revive itself. "

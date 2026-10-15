@@ -177,7 +177,7 @@ async def summarize_results(query: str, results: list[SearchItem], mode: str = "
             "content": f"Mode: {mode}\nQuery: {query}\n\nResults:\n{source_block}",
         },
     ]
-    reply = await llm.generate_response(prompt, temperature=0.35, max_tokens=500)
+    reply = await llm.generate_visible_response(prompt, temperature=0.35, max_tokens=500)
     return filter_links(reply, include_links)
 
 

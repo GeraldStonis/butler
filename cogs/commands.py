@@ -63,7 +63,7 @@ class CommandsCog(commands.Cog):
             current_author_id=interaction.user.id,
         )
 
-        reply = await llm.generate_response(
+        reply = await llm.generate_visible_response(
             context, temperature=0.3  # Lower temp for factual accuracy
         )
 
@@ -121,7 +121,7 @@ class CommandsCog(commands.Cog):
             },
         ]
 
-        reply = await llm.generate_response(context, temperature=0.8)
+        reply = await llm.generate_visible_response(context, temperature=0.8)
         guild = interaction.guild
         reply = await emoji_filter.filter_response(reply, guild)
 
@@ -161,7 +161,7 @@ class CommandsCog(commands.Cog):
             },
         ]
 
-        reply = await llm.generate_response(context, temperature=0.8)
+        reply = await llm.generate_visible_response(context, temperature=0.8)
         guild = interaction.guild
         reply = await emoji_filter.filter_response(reply, guild)
 
@@ -237,7 +237,7 @@ class CommandsCog(commands.Cog):
             },
         ]
         
-        reply = await llm.generate_response(context, temperature=0.7)
+        reply = await llm.generate_visible_response(context, temperature=0.7)
         guild = interaction.guild
         reply = await emoji_filter.filter_response(reply, guild)
 

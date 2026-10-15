@@ -19,7 +19,7 @@ _trivia_next = 0.0
 
 
 async def commentary(event: str) -> str:
-    text = await asyncio.wait_for(llm.generate_response([
+    text = await asyncio.wait_for(llm.generate_visible_response([
         {"role": "system", "content": config.load_persona()},
         {"role": "system", "content": (
             "Write one NEW short, sassy line for this game or music event. No fixed catchphrases, "

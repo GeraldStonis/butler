@@ -18,7 +18,7 @@ from discord.ext import commands
 import config
 from services import actions, database as db, emoji_filter, intent, llm, memory
 from services.response_text import requests_links
-from services import social, conversation
+from services import social, conversation, avatar_edits
 
 log = logging.getLogger("nixi.chat")
 
@@ -76,6 +76,14 @@ class ChatCog(commands.Cog):
             await db.set_state(f"guest_retort:{channel_id}", reply)
         return reply
 
+    async def _avatar_reaction(self, message: discord.Message, reply: str) -> bytes | None:
+        try:
+            return await asyncio.wait_for(avatar_edits.maybe_reaction(message, reply),
+                                          timeout=config.AVATAR_EDIT_TIMEOUT_SECONDS + 5)
+        except Exception as exc:
+            log.info("Sending reply without avatar edit (%s)", type(exc).__name__)
+            return None
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         if not message.author.bot:
@@ -127,7 +135,8 @@ class ChatCog(commands.Cog):
             ))
         if mode is None:
             return
-        preferences = {"roasting": True, "media": True, "pings": True}
+        preferences = {"roasting": True, "media": True, "pings": True, "avatar_edits": True}
+        updates = {}
         if guild_id is not None:
             updates = social.preference_updates(content) if mode != "OWNER_UNAVAILABLE" else {}
             if updates:
@@ -140,8 +149,14 @@ class ChatCog(commands.Cog):
 
         fixed_reply = None
         guest_kind = None
+        if "avatar_edits" in updates:
+            fixed_reply = (
+                "Avatar edits enabled for you. Your avatar may be uploaded to Cloudflare for cartoon caricatures. "
+                "Say 'nixi stop editing my avatar' to opt out."
+                if updates["avatar_edits"] else "Avatar edits disabled for you."
+            )
         if mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"}:
-            if message.author.id != config.OWNER_ID:
+            if fixed_reply is None and message.author.id != config.OWNER_ID:
                 guest_kind = await social.classify_guest_message(content)
                 if guest_kind == "command":
                     fixed_reply = await self._guest_retort(message.channel.id, content)
@@ -153,13 +168,17 @@ class ChatCog(commands.Cog):
                 fixed_reply = "Missed me?"
                 self._greetings[greeting_key] = time.monotonic()
         if fixed_reply:
-            await message.reply(fixed_reply, mention_author=False)
+            avatar_image = await self._avatar_reaction(message, fixed_reply) if guest_kind == "command" else None
+            if avatar_image and await avatar_edits.send_reply(message, avatar_image, fixed_reply) is None:
+                avatar_image = None
+            if not avatar_image:
+                await message.reply(fixed_reply, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
             await memory.log_message(
                 channel_id=message.channel.id,
                 guild_id=guild_id,
                 author_id=self.bot.user.id,
                 author_name="Nixi",
-                content=fixed_reply,
+                content=fixed_reply + ("\n[AI-edited avatar caricature delivered]" if avatar_image else ""),
                 is_bot=True,
             )
             return
@@ -234,12 +253,15 @@ class ChatCog(commands.Cog):
                 reply_text = reply_text[:1997] + "..."
 
             reaction_media = None
+            avatar_image = None
             if (mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"} and not refused_guest_request
-                    and preferences["media"] and not conversation.serious_message(content)
+                    and reply_text.strip() and preferences["media"] and not conversation.serious_message(content)
                     and reply_text.strip().lower() != "shush."):
+                avatar_image = await self._avatar_reaction(message, reply_text)
                 try:
-                    reaction_media = await asyncio.wait_for(
-                        self._automatic_media.choose(message.channel.id, content, reply_text), timeout=12)
+                    if not avatar_image:
+                        reaction_media = await asyncio.wait_for(
+                            self._automatic_media.choose(message.channel.id, content, reply_text), timeout=12)
                 except asyncio.TimeoutError:
                     log.info("Sending text without delayed automatic media")
 
@@ -248,8 +270,11 @@ class ChatCog(commands.Cog):
 
         reply_kwargs = {"embed": actions._media_embed(reaction_media)} if reaction_media else {}
         delivered_text = "" if reaction_media and reaction_media.standalone else reply_text
-        await message.reply(delivered_text or None, mention_author=False,
-                            allowed_mentions=discord.AllowedMentions.none(), **reply_kwargs)
+        if avatar_image and await avatar_edits.send_reply(message, avatar_image, delivered_text or None) is None:
+            avatar_image = None
+        if not avatar_image:
+            await message.reply(delivered_text or None, mention_author=False,
+                                allowed_mentions=discord.AllowedMentions.none(), **reply_kwargs)
         if mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"}:
             continuing = (mode == "REPLY_CHAIN" and not getattr(message, "reference", None)
                           and message.channel.id in self._followups)
@@ -261,7 +286,8 @@ class ChatCog(commands.Cog):
             guild_id=guild_id,
             author_id=self.bot.user.id,  # type: ignore[union-attr]
             author_name="Nixi",
-            content=delivered_text + (f"\n[Automatic media delivered: {reaction_media.title[:200]}]" if reaction_media else ""),
+            content=delivered_text + (f"\n[Automatic media delivered: {reaction_media.title[:200]}]" if reaction_media else "")
+                    + ("\n[AI-edited avatar caricature delivered]" if avatar_image else ""),
             is_bot=True,
         )
 

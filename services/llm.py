@@ -14,6 +14,7 @@ import json
 from ollama import AsyncClient
 
 import config
+from services.response_text import VISIBLE_REPLY_POLICY, has_non_latin_prose
 
 log = logging.getLogger("nixi.llm")
 
@@ -93,3 +94,34 @@ async def generate_response(
         if failure_reply is not None:
             return failure_reply
         return "I lost the thread for a moment. Try that again."
+
+
+async def generate_visible_response(
+    messages: list[dict[str, str]],
+    temperature: float = 0.85,
+    max_tokens: int = 600,
+    failure_reply: str | None = None,
+) -> str:
+    """Apply speech rules to public text, with at most one script-repair pass."""
+    prompt = list(messages)
+    position = len(prompt) - 1 if prompt and prompt[-1]["role"] == "user" else len(prompt)
+    prompt.insert(position, {"role": "system", "content": VISIBLE_REPLY_POLICY})
+    reply = await generate_response(prompt, temperature=temperature, max_tokens=max_tokens,
+                                    failure_reply=failure_reply)
+    if not has_non_latin_prose(reply):
+        return reply
+    log.info("Rewriting a visible reply into Latin-script speech")
+    repair = [*prompt,
+              {"role": "assistant", "content": reply},
+              {"role": "system", "content": (
+                  "Rewrite the previous draft once: its conversational prose used a forbidden "
+                  "script. Keep the same meaning, tone and level of detail, but write English, "
+                  "Roman-script Hinglish, or Roman-script Bhojpuri only. Preserve emojis, code, "
+                  "URLs and Discord tokens exactly. Do not add claims, perform any new request, "
+                  "quote the old script, or explain the rewrite. Output only the corrected reply."
+              )}]
+    fixed = await generate_response(repair, temperature=0.2, max_tokens=max_tokens, failure_reply="")
+    if fixed and not has_non_latin_prose(fixed):
+        return fixed
+    log.info("Skipped a visible reply after unsuccessful script repair")
+    return failure_reply if failure_reply is not None else "I lost the thread for a moment. Try that again."
