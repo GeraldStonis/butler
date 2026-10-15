@@ -235,6 +235,8 @@ class HousekeepingCog(commands.Cog):
     async def _maybe_send_random_meme(self) -> None:
         if not config.MEME_DROP_ENABLED or not config.MEME_DROP_CHANNEL_ID:
             return
+        if config.MEME_DROP_CHANNEL_ID == config.STICKER_SPAM_CHANNEL_ID and not config.STICKER_SPAM_ENABLED:
+            return
         channel = self.bot.get_channel(config.MEME_DROP_CHANNEL_ID)
         if not isinstance(channel, discord.TextChannel):
             log.warning("Meme drop channel not found: %d", config.MEME_DROP_CHANNEL_ID)

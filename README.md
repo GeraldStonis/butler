@@ -46,6 +46,8 @@ The key design rule is simple:
   Image-byte checks are bounded to 8 MB and a 60-second overall generation budget.
   `MEME_DROP_ENABLED` defaults to true, `MEME_DROP_INTERVAL_SECONDS` to 300;
   `MEME_DROP_CHANNEL_ID` defaults to the configured sticker/spam channel.
+  In that shared channel, `STICKER_SPAM_ENABLED=false` stops both scheduled
+  stickers and memes. Meme drops to a different channel remain independent.
   The first drop waits one interval, and the next scheduled time survives restarts.
 - Rolling channel memory, summaries, long-term memories, and owner instructions.
 - Server emoji support without forcing an emoji into every reply.
@@ -194,6 +196,12 @@ activity in, or set to comma-separated channel IDs.
 
 Set `STICKER_SPAM_CHANNEL_ID` to your spam channel ID to send one random server
 sticker every `STICKER_SPAM_INTERVAL_SECONDS`.
+Set `STICKER_SPAM_ENABLED=false` to stop scheduled stickers and meme drops in
+that channel. Set `MEME_DROP_ENABLED=false` to stop scheduled memes in any channel.
+Neither setting blocks Ronix's direct meme requests or media used in chat replies;
+`AUTOMATIC_MEDIA_ENABLED=false` separately disables automatic chat-reply media.
+Environment changes take effect after restarting the bot. On Railway, update
+the service's Variables and redeploy; editing a local `.env` does not update it.
 Scheduled stickers and automatic meme/music drops in that channel pause from
 midnight until 08:00 in `SERVER_TIMEZONE`, using `SPAM_QUIET_HOURS=00:00-08:00`
 by default. Normal replies and Ronix's direct requests still work overnight;
