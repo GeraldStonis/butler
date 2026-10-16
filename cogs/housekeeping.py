@@ -18,6 +18,7 @@ from services import actions, database as db, memory, media, llm, music, activit
 from services.response_text import filter_links
 
 log = logging.getLogger("nixi.housekeeping")
+DEAD_CHAT_MESSAGE_TTL_SECONDS = 24 * 60 * 60
 
 DEAD_CHAT_EXAMPLES = (
     "ded chat. {member}, all that aura and not one conversation. Say something.",
@@ -105,7 +106,8 @@ class HousekeepingCog(commands.Cog):
 
     @tasks.loop(seconds=15)
     async def housekeeping_loop(self) -> None:
-        for task in (self._maybe_send_morning_news, self._maybe_nudge_dead_chat, self._maybe_send_random_meme, self._maybe_send_music):
+        for task in (self._delete_expired_dead_chat_messages, self._maybe_send_morning_news,
+                     self._maybe_nudge_dead_chat, self._maybe_send_random_meme, self._maybe_send_music):
             try:
                 await task()
             except Exception:
@@ -125,6 +127,24 @@ class HousekeepingCog(commands.Cog):
     @sticker_spam_loop.before_loop
     async def before_sticker_spam(self) -> None:
         await self.bot.wait_until_ready()
+
+    async def _delete_expired_dead_chat_messages(self) -> None:
+        # Persisted IDs avoid cache/history scans and survive worker restarts.
+        for row in await db.get_due_dead_chat_deletions(time.time()):
+            try:
+                channel = self.bot.get_partial_messageable(row["channel_id"])
+                await channel.get_partial_message(row["message_id"]).delete()
+            except discord.NotFound:
+                pass  # Already removed by a member, moderator, or channel deletion.
+            except discord.HTTPException as exc:
+                log.warning("Dead-chat message %d could not be deleted (HTTP %d)", row["message_id"], exc.status)
+                await db.defer_dead_chat_deletion(row["message_id"], time.time() + (3600 if exc.status == 403 else 300))
+                continue
+            except Exception:
+                log.exception("Dead-chat message %d deletion failed", row["message_id"])
+                await db.defer_dead_chat_deletion(row["message_id"], time.time() + 300)
+                continue
+            await db.finish_dead_chat_deletion(row["message_id"])
 
     async def _maybe_send_morning_news(self) -> None:
         if not config.MORNING_NEWS_ENABLED or not config.MORNING_NEWS_CHANNEL_ID:
@@ -213,6 +233,8 @@ class HousekeepingCog(commands.Cog):
                     f"{member.mention} {line}",
                     allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=[discord.Object(id=member.id)], replied_user=False),
                 )
+                await db.schedule_dead_chat_deletion(
+                    channel.id, sent.id, sent.created_at.timestamp() + DEAD_CHAT_MESSAGE_TTL_SECONDS)
                 await db.mark_dead_chat_ping(channel.id)
                 await db.set_state(line_key, line)
                 await db.set_state(retry_key, "0")

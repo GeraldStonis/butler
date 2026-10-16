@@ -275,6 +275,15 @@ not normal replies, memes, music, or stickers. It does not consume or reset the
 five-ping counter; the normal schedule resumes after 08:00 when a nudge is due.
 Set this value to blank to disable the dead-chat-specific window.
 
+New dead-chat ping messages are automatically deleted after 24 hours, on the
+next housekeeping pass. Their message IDs and deadlines are stored in SQLite,
+so cleanup survives restarts and catches up when Nixi comes back online.
+Cleanup runs during quiet hours and even if new dead-chat pings are disabled.
+Already-deleted messages are ignored; Discord failures are retried with backoff.
+Only Nixi's recorded dead-chat messages are removed, not member replies, other
+bot posts, or older pings sent before this feature was deployed. No new settings
+are required; keep the existing database volume mounted on Railway.
+
 Dead-chat revival uses the original roast-and-ping behavior: a freshly generated
 roast plus one random non-bot member's mention, excluding Ronix and members who
 opted out of pings or teasing. Targets vary when possible; a single eligible

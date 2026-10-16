@@ -76,7 +76,10 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         connection = await db.get_db()
         channel = MagicMock(spec=discord.TextChannel)
         channel.id = 10
-        channel.send = AsyncMock()
+        channel.send = AsyncMock(side_effect=[
+            SimpleNamespace(id=101, created_at=datetime.now(timezone.utc)),
+            SimpleNamespace(id=102, created_at=datetime.now(timezone.utc)),
+        ])
         cog = object.__new__(HousekeepingCog)
         cog.bot = SimpleNamespace(get_channel=lambda _: channel)
         cog._pick_random_member = AsyncMock(return_value=SimpleNamespace(id=20, mention='<@20>'))
@@ -98,6 +101,9 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotEqual(channel.send.call_args.args[0], first_line)
             self.assertIn('<@20>', channel.send.call_args.args[0])
             self.assertEqual(dead_chat_delay_seconds(await self.row()), 240)
+            pending = await db.get_due_dead_chat_deletions(float('inf'))
+            self.assertEqual({row['message_id'] for row in pending}, {101, 102})
+            self.assertEqual({row['channel_id'] for row in pending}, {10})
 
     async def test_five_ping_cap_survives_restart_and_human_resets(self):
         with patch('config.DEAD_CHAT_IDLE_SECONDS', 300):
@@ -125,7 +131,7 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         await connection.commit()
         channel = MagicMock(spec=discord.TextChannel)
         channel.id = 10
-        channel.send = AsyncMock()
+        channel.send = AsyncMock(return_value=SimpleNamespace(id=103, created_at=datetime.now(timezone.utc)))
         games = SimpleNamespace(active={}, start_game=AsyncMock(return_value=True))
         cog = object.__new__(HousekeepingCog)
         cog.bot = SimpleNamespace(get_channel=lambda _: channel, get_cog=lambda _: games)

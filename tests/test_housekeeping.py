@@ -24,6 +24,7 @@ class HousekeepingTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_news_failure_does_not_stop_dead_chat(self):
         cog = object.__new__(HousekeepingCog)
+        cog._delete_expired_dead_chat_messages = AsyncMock()
         cog._maybe_send_morning_news = AsyncMock(side_effect=RuntimeError('offline'))
         cog._maybe_nudge_dead_chat = AsyncMock()
         cog._maybe_send_random_meme = AsyncMock()
@@ -31,3 +32,17 @@ class HousekeepingTests(unittest.IsolatedAsyncioTestCase):
         with self.assertLogs('nixi.housekeeping', level='ERROR'):
             await HousekeepingCog.housekeeping_loop.coro(cog)
         cog._maybe_nudge_dead_chat.assert_awaited_once()
+
+    async def test_cleanup_failure_does_not_stop_scheduled_posts(self):
+        cog = object.__new__(HousekeepingCog)
+        cog._delete_expired_dead_chat_messages = AsyncMock(side_effect=RuntimeError('database offline'))
+        cog._maybe_send_morning_news = AsyncMock()
+        cog._maybe_nudge_dead_chat = AsyncMock()
+        cog._maybe_send_random_meme = AsyncMock()
+        cog._maybe_send_music = AsyncMock()
+        with self.assertLogs('nixi.housekeeping', level='ERROR'):
+            await HousekeepingCog.housekeeping_loop.coro(cog)
+        cog._maybe_send_morning_news.assert_awaited_once()
+        cog._maybe_nudge_dead_chat.assert_awaited_once()
+        cog._maybe_send_random_meme.assert_awaited_once()
+        cog._maybe_send_music.assert_awaited_once()

@@ -121,6 +121,14 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             value      TEXT NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS dead_chat_deletions (
+            message_id      INTEGER PRIMARY KEY,
+            channel_id      INTEGER NOT NULL,
+            delete_at       REAL NOT NULL,
+            next_attempt_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_dead_chat_deletions_due
+            ON dead_chat_deletions (next_attempt_at, message_id);
         CREATE TABLE IF NOT EXISTS activity_scores (
             guild_id INTEGER NOT NULL,
             user_id INTEGER NOT NULL,
@@ -324,6 +332,40 @@ async def mark_dead_chat_ping(channel_id: int) -> None:
                last_channel_message_at = CURRENT_TIMESTAMP""",
         (channel_id,),
     )
+    await db.commit()
+
+
+async def schedule_dead_chat_deletion(channel_id: int, message_id: int, delete_at: float) -> None:
+    """Persist a new nudge's expiry without extending an existing deadline."""
+    db = await get_db()
+    await db.execute(
+        """INSERT OR IGNORE INTO dead_chat_deletions
+           (message_id, channel_id, delete_at, next_attempt_at) VALUES (?, ?, ?, ?)""",
+        (message_id, channel_id, delete_at, delete_at),
+    )
+    await db.commit()
+
+
+async def get_due_dead_chat_deletions(now: float, limit: int = 25) -> list[dict]:
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT message_id, channel_id, delete_at FROM dead_chat_deletions
+           WHERE next_attempt_at <= ? AND delete_at <= ?
+           ORDER BY next_attempt_at, message_id LIMIT ?""", (now, now, limit),
+    )
+    return [dict(row) for row in await cursor.fetchall()]
+
+
+async def finish_dead_chat_deletion(message_id: int) -> None:
+    db = await get_db()
+    await db.execute("DELETE FROM dead_chat_deletions WHERE message_id = ?", (message_id,))
+    await db.commit()
+
+
+async def defer_dead_chat_deletion(message_id: int, retry_at: float) -> None:
+    db = await get_db()
+    await db.execute("UPDATE dead_chat_deletions SET next_attempt_at = ? WHERE message_id = ?",
+                     (retry_at, message_id))
     await db.commit()
 
 
