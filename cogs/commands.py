@@ -18,7 +18,7 @@ from discord.ext import commands
 
 import config
 from services import llm, memory, emoji_filter, database as db
-from services.response_text import requests_links
+from services.response_text import FALLBACK_REACTION, requests_links
 
 log = logging.getLogger("nixi.commands")
 
@@ -241,7 +241,7 @@ class CommandsCog(commands.Cog):
         guild = interaction.guild
         reply = await emoji_filter.filter_response(reply, guild)
 
-        await interaction.followup.send(reply[:2000] or "No reply available right now.")
+        await interaction.followup.send(reply[:2000] or FALLBACK_REACTION)
         
         # Log to memory so it has context of its own words
         guild_id = interaction.guild.id if interaction.guild else None

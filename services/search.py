@@ -148,13 +148,8 @@ async def image_search(query: str, count: int = 6) -> list[SearchItem]:
 
 async def summarize_results(query: str, results: list[SearchItem], mode: str = "search", *, include_links: bool = False) -> str:
     """Create a short summary; visible sources are opt-in."""
-    if not (config.TAVILY_API_KEY or config.BRAVE_SEARCH_API_KEY):
-        return (
-            "I can search the web once TAVILY_API_KEY is configured. "
-            "At present, my opera glasses are decorative."
-        )
     if not results:
-        return filter_links(f"I searched for '{query}', but found nothing worth presenting.", include_links)
+        return ""
 
     source_block = "\n".join(
         f"{idx + 1}. {item.title}\nURL: {item.url}\nSummary: {item.description}"
@@ -177,7 +172,7 @@ async def summarize_results(query: str, results: list[SearchItem], mode: str = "
             "content": f"Mode: {mode}\nQuery: {query}\n\nResults:\n{source_block}",
         },
     ]
-    reply = await llm.generate_visible_response(prompt, temperature=0.35, max_tokens=500)
+    reply = await llm.generate_visible_response(prompt, temperature=0.35, max_tokens=500, failure_reply="")
     return filter_links(reply, include_links)
 
 

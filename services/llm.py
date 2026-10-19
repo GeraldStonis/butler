@@ -14,7 +14,7 @@ import json
 from ollama import AsyncClient
 
 import config
-from services.response_text import VISIBLE_REPLY_POLICY, has_non_latin_prose
+from services.response_text import FALLBACK_REACTION, VISIBLE_REPLY_POLICY, has_non_latin_prose
 
 log = logging.getLogger("nixi.llm")
 
@@ -93,12 +93,12 @@ async def generate_response(
                             except (ValueError, AttributeError):
                                 pass
                         return re.sub(r"^(?:\[)?Nixi(?:\])?:\s*", "", content, flags=re.I)
-        return failure_reply if failure_reply is not None else "I lost the thread for a moment. Try that again."
+        return failure_reply if failure_reply is not None else FALLBACK_REACTION
     except Exception as exc:
         log.warning("LLM call failed (%s)", type(exc).__name__)
         if failure_reply is not None:
             return failure_reply
-        return "I lost the thread for a moment. Try that again."
+        return FALLBACK_REACTION
 
 
 async def generate_visible_response(
@@ -129,4 +129,4 @@ async def generate_visible_response(
     if fixed and not has_non_latin_prose(fixed):
         return fixed
     log.info("Skipped a visible reply after unsuccessful script repair")
-    return failure_reply if failure_reply is not None else "I lost the thread for a moment. Try that again."
+    return failure_reply if failure_reply is not None else FALLBACK_REACTION

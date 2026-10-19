@@ -179,6 +179,8 @@ class HousekeepingCog(commands.Cog):
             return
 
         briefing = await actions.build_news_briefing()
+        if not briefing.strip():
+            return
         sent = await channel.send(briefing)
         await memory.log_delivery(sent)
         await db.set_state(state_key, today_key)

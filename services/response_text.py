@@ -4,6 +4,8 @@ import re
 import unicodedata
 
 
+FALLBACK_REACTION = "\u2615"
+
 VISIBLE_REPLY_POLICY = (
     "VISIBLE REPLY LANGUAGE AND REGISTER: Speak only English, Hinglish, or Bhojpuri, "
     "using Latin/Roman letters for all conversational prose. Never use Devanagari "

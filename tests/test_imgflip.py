@@ -219,12 +219,12 @@ class ImgflipTests(unittest.IsolatedAsyncioTestCase):
         message = SimpleNamespace(author=SimpleNamespace(id=20), content='nixi make a gif meme about lag', reply=AsyncMock())
         request = intent.heuristic_intent(message.content)
         self.assertEqual(request.name, 'captioned_gif')
-        with patch.object(media, 'fetch_captioned_gif', AsyncMock()) as fetch:
+        with patch.object(media, 'fetch_captioned_gif', AsyncMock()) as fetch, patch('services.actions.conversation.discreet_reply', AsyncMock(return_value='A little good humor goes a long way.')):
             self.assertFalse(await actions.execute_owner_intent(message, request))
             message.author.id = 99
             self.assertTrue(await actions.execute_owner_intent(message, request))
         fetch.assert_not_awaited()
-        self.assertIn('Premium', message.reply.await_args.args[0])
+        self.assertEqual(message.reply.await_args.args[0], 'A little good humor goes a long way.')
         self.assertEqual(social.guest_kind_hint('nixi caption a gif about lag'), 'command')
 
     async def test_captioned_gif_delivery_is_an_embed_not_a_text_url(self):

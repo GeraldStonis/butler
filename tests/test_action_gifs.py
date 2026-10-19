@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import config
 from cogs.chat import ChatCog
-from services import actions, avatar_edits, database as db, intent, media, memory
+from services import actions, avatar_edits, conversation, database as db, intent, media, memory
 
 
 class ActionGifTests(unittest.IsolatedAsyncioTestCase):
@@ -17,6 +17,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
         self.enterContext(patch.object(intent.llm, 'generate_response', AsyncMock(side_effect=AssertionError('Unexpected model request'))))
         self.edit = self.enterContext(patch.object(avatar_edits, 'generate', AsyncMock()))
         self.prepare = self.enterContext(patch.object(avatar_edits, 'prepare_owner_scene', AsyncMock()))
+        self.discreet = self.enterContext(patch.object(conversation, 'discreet_reply', AsyncMock(return_value='A little warmth for the room.')))
         self.delivered = self.enterContext(patch.object(memory, 'log_delivery', AsyncMock()))
         self.target = SimpleNamespace(id=20, bot=False, name='guest', display_name='Guest')
         self.owner = SimpleNamespace(id=99, bot=False, name='ronix', display_name='Ronix')
@@ -129,12 +130,15 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
         self.edit.assert_not_awaited()
         self.cog._avatar_reaction.assert_not_awaited()
 
-    async def test_missing_member_asks_for_a_mention_without_fetch_or_edit(self):
+    async def test_missing_member_sends_untagged_gif_without_requesting_a_mention(self):
         message = self.message('nixi give someone a hug', mentions=[])
-        with patch.object(media, 'fetch_gif', AsyncMock()) as fetch:
+        with patch.object(media, 'fetch_gif', AsyncMock(return_value=self.result)) as fetch:
             await self.cog._handle_message(message)
-        fetch.assert_not_awaited()
-        self.assertIn('Mention a member', message.reply.await_args.args[0])
+        fetch.assert_awaited_once_with(media.SAFE_ACTION_QUERIES['hug'])
+        message.reply.assert_not_awaited()
+        self.assertEqual(message.channel.send.await_args.args, (None,))
+        self.assertEqual(message.channel.send.await_args.kwargs['embed'].image.url, self.result.url)
+        self.assertFalse(message.channel.send.await_args.kwargs['allowed_mentions'].users)
         self.edit.assert_not_awaited()
         self.cog._avatar_reaction.assert_not_awaited()
 

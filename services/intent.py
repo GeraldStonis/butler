@@ -63,11 +63,52 @@ def _reaction_action(text: str) -> str:
     return ""
 
 
+def _song_request(text: str) -> OwnerIntent | None:
+    text = re.sub(r"<@!?\d+>", "", text).strip(" ,:!?.\n")
+    match = re.match(
+        r"^(?:(?:hey|yo|please|pls)[\s,:]+)*(?:(?:can|could|would|will)\s+you\s+)?"
+        r"(play|put on|queue|send|share|give|gimme|recommend|suggest|drop)\s+(?:(?:me|us)\s+)?(.+)$",
+        text, re.I,
+    )
+    if not match:
+        return None
+    verb, query = match.groups()
+    musical = re.search(r"\b(?:songs?|music|tracks?|tunes?|playlist)\b", query, re.I)
+    if verb.lower() not in {"play", "put on", "queue"} and not musical:
+        return None
+    if verb.lower() not in {"play", "put on", "queue"} and re.search(
+        r"\b(?:news|headlines|information|explanation|books?|articles?)\b", query, re.I,
+    ):
+        return None
+    if re.search(r"\b(?:gifs?|memes?|images?|pictures?|videos?|games?|trivia|quiz|cards|chess)\b", query, re.I):
+        return None
+    if re.search(r"\b(?:higher[ -](?:or[ -])?lower|high[ -]low)\b", query, re.I):
+        return None
+    if re.search(r"\b(?:vc|voice(?:\s+(?:channel|chat))?)\b", query, re.I):
+        return OwnerIntent("chat")  # Sharing a preview is not voice playback.
+    query = re.sub(r"(?:,?\s+(?:please|pls))+$", "", query, flags=re.I).strip(" .!?\"'")
+    if re.fullmatch(
+        r"(?:(?:a|an|some|any|another|random|one|more)\s+)*(?:random\s+)?"
+        r"(?:songs?|music|tracks?|tunes?|something|one)"
+        r"(?:\s+(?:from|off)\s+(?:(?:your|the|my|our)\s+)?playlist)?"
+        r"(?:\s+for\s+(?:me|us|everyone))?", query, re.I,
+    ):
+        query = ""
+    else:
+        query = re.sub(r"^(?:(?:a|some|any)\s+)?(?:songs?|music|tracks?|tunes?|something)\s+", "", query, flags=re.I)
+        query = re.sub(r"^(?:called|named|titled|by|from|a|some)\s+", "", query, flags=re.I)
+        query = re.sub(r"\s+(?:songs?|music|tracks?|tunes?)$", "", query, flags=re.I)
+    return OwnerIntent("song", query=query.strip(" \"'"))
+
+
 def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | None:
     """Catch common requests without spending an LLM call."""
     mentions = mentions or []
     cleaned = _strip_bot_name(text)
     lower = cleaned.lower()
+    song_request = _song_request(cleaned)
+    if song_request:
+        return song_request
     target_id = _first_mention_id(mentions)
     reaction_target_id = _first_mention_id(mentions, include_owner=True)
     informational = re.match(
@@ -166,14 +207,21 @@ async def classify_owner_intent(text: str, mentions: list | None = None) -> Owne
             "content": (
                 "Classify the user's Discord message for a butler bot. Return ONLY "
                 "valid JSON with keys: intent, query, action. Valid intents: chat, "
-                "web_search, news, image_search, gif_search, action_gif, captioned_gif, meme, tea, coffee, trivia, cards, leaderboard, cat, avatar_edit. "
+                "web_search, news, image_search, gif_search, action_gif, captioned_gif, meme, tea, coffee, song, trivia, cards, leaderboard, cat, avatar_edit. "
+                "Use song for requests to play/share/recommend music in text chat: the application "
+                "selects a real YouTube preview from its local playlist. Set query to only the "
+                "requested title, artist, or category, or an empty string for any/random song. "
+                "Never invent a video ID or URL. Explicit requests for voice-channel playback "
+                "are chat, because the bot shares previews, not voice audio. Questions about "
+                "music or how playback works are chat, not song requests. "
                 "Use action_gif for social actions toward a member, such as giving a handshake, "
                 "punch, kiss, kick, hug, pat, high five, fist bump, wave, or a similar reaction. "
                 "Set action to a short plain-English action phrase; do not invent a target ID. "
                 "These requests mean search for an existing reaction GIF and tag the member, "
                 "NOT an AI caricature, even when phrased as 'make @user hug someone'. "
-                "For 'hug someone' without an actual mention, still use action_gif; the "
-                "application will ask which member. Questions discussing actions are chat, "
+                "For 'hug someone' or 'give me a handshake GIF' without an actual mention, "
+                "still use action_gif: send the GIF without tagging anyone. Mentions are "
+                "optional; never ask for one just to send a GIF. Questions discussing actions are chat, "
                 "not instructions to perform them. Never perform a negated action request. "
                 "Use captioned_gif only when asked to create an animated meme or add new captions "
                 "to a GIF template, not to search for an ordinary reaction GIF. "
@@ -199,7 +247,7 @@ async def classify_owner_intent(text: str, mentions: list | None = None) -> Owne
 
     name = str(data.get("intent", "chat")).strip()
     if name not in {
-        "chat", "web_search", "news", "image_search", "gif_search", "action_gif", "captioned_gif", "meme", "tea", "coffee", "trivia", "cards", "leaderboard", "cat", "avatar_edit"
+        "chat", "web_search", "news", "image_search", "gif_search", "action_gif", "captioned_gif", "meme", "tea", "coffee", "song", "trivia", "cards", "leaderboard", "cat", "avatar_edit"
     }:
         name = "chat"
     action = str(data.get("action", "")).strip()

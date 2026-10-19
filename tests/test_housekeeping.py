@@ -33,6 +33,17 @@ class HousekeepingTests(unittest.IsolatedAsyncioTestCase):
             await HousekeepingCog.housekeeping_loop.coro(cog)
         cog._maybe_nudge_dead_chat.assert_awaited_once()
 
+    async def test_empty_news_is_not_sent_as_a_public_status_message(self):
+        cog = object.__new__(HousekeepingCog)
+        channel = MagicMock(spec=discord.TextChannel)
+        channel.send = AsyncMock()
+        cog.bot = SimpleNamespace(get_channel=lambda _: channel)
+        with patch('config.MORNING_NEWS_ENABLED', True), patch('config.MORNING_NEWS_CHANNEL_ID', 123), patch('config.MORNING_NEWS_TIME', '08:00'), patch('cogs.housekeeping.datetime') as clock, patch('cogs.housekeeping.db.get_state', AsyncMock(return_value=None)), patch('cogs.housekeeping.db.set_state', AsyncMock()) as saved, patch('cogs.housekeeping.actions.build_news_briefing', AsyncMock(return_value='')):
+            clock.now.return_value = datetime(2026, 10, 14, 8, 5)
+            await cog._maybe_send_morning_news()
+        channel.send.assert_not_awaited()
+        saved.assert_not_awaited()
+
     async def test_cleanup_failure_does_not_stop_scheduled_posts(self):
         cog = object.__new__(HousekeepingCog)
         cog._delete_expired_dead_chat_messages = AsyncMock(side_effect=RuntimeError('database offline'))

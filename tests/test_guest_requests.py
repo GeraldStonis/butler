@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import config
 from cogs.chat import ChatCog
-from services import actions, avatar_edits, database as db, intent, media, memory, social
+from services import actions, avatar_edits, database as db, intent, media, memory, music, social
 
 
 class GuestRequestTests(unittest.IsolatedAsyncioTestCase):
@@ -17,6 +17,7 @@ class GuestRequestTests(unittest.IsolatedAsyncioTestCase):
         self.logged = self.stack.enter_context(patch('cogs.chat.memory.log_message', AsyncMock()))
         self.stack.enter_context(patch('cogs.chat.memory.build_context', AsyncMock(return_value=[{'role': 'user', 'content': 'request'}])))
         self.chat = self.stack.enter_context(patch('cogs.chat.conversation.generate_reply', AsyncMock(return_value='A little poem for the room.')))
+        self.discreet = self.stack.enter_context(patch('cogs.chat.conversation.discreet_reply', AsyncMock(return_value='A little warmth for the room.')))
         self.stack.enter_context(patch.object(social.llm, 'generate_response', AsyncMock(side_effect=AssertionError('Unexpected external model call'))))
         self.stack.enter_context(patch('cogs.chat.memory.extract_and_store_memories', AsyncMock()))
         self.cog = ChatCog(SimpleNamespace(user=SimpleNamespace(id=999), get_cog=lambda _: None))
@@ -58,6 +59,17 @@ class GuestRequestTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(message.reply.await_args.kwargs['embed'].image.url, result.url)
                 self.cog._guest_retort.assert_not_awaited()
         self.chat.assert_not_awaited()
+
+    async def test_owner_and_guests_can_request_real_playlist_songs(self):
+        song = {'title': 'Apocalypse', 'artist': 'Cigarettes After Sex', 'youtubeId': 'sElE_BfQ67s'}
+        with patch.object(music, 'load_songs', return_value=[song]):
+            for user_id in [config.OWNER_ID, config.OWNER_ID + 1]:
+                message = self.message('nixi play Apocalypse', user_id=user_id)
+                await self.cog._handle_message(message)
+                self.assertIn('https://www.youtube.com/watch?v=sElE_BfQ67s', message.reply.await_args.args[0])
+        self.chat.assert_not_awaited()
+        self.cog._guest_retort.assert_not_awaited()
+        self.cog._automatic_media.choose.assert_not_awaited()
 
     async def test_guest_can_search_and_request_news(self):
         for index, (text, provider) in enumerate([
@@ -137,7 +149,7 @@ class GuestRequestTests(unittest.IsolatedAsyncioTestCase):
             await self.cog._handle_message(first)
             second = self.message('nixi serve tea')
             await self.cog._handle_message(second)
-            self.assertIn('wait', second.reply.await_args.args[0])
+            self.assertEqual(second.reply.await_args.args[0], self.discreet.return_value)
             await self.cog._handle_message(self.message('nixi serve tea', user_id=config.OWNER_ID + 2))
             for _ in range(2):
                 await self.cog._handle_message(self.message('nixi serve tea', user_id=config.OWNER_ID))
@@ -157,7 +169,7 @@ class GuestRequestTests(unittest.IsolatedAsyncioTestCase):
             second = self.message('nixi serve tea', guild=SimpleNamespace(id=1))
             second.channel.id = 11
             await self.cog._handle_message(second)
-            self.assertIn('wait', second.reply.await_args.args[0])
+            self.assertEqual(second.reply.await_args.args[0], self.discreet.return_value)
             await self.cog._handle_message(self.message('nixi serve tea', guild=SimpleNamespace(id=2)))
         self.assertEqual(fetch.await_count, 2)
 
@@ -197,10 +209,12 @@ class GuestRequestTests(unittest.IsolatedAsyncioTestCase):
         target = SimpleNamespace(id=20, bot=False)
         guild = SimpleNamespace(id=1, get_member=lambda _: target)
         message = self.message('nixi bonk someone', guild=guild)
-        with patch.object(media, 'fetch_action_gif', AsyncMock()) as fetch:
+        result = media.MediaResult('Bonk', 'https://example.test/bonk.gif')
+        with patch.object(media, 'fetch_action_gif', AsyncMock(return_value=result)) as fetch:
             self.assertTrue(await actions.execute_guest_intent(message, intent.OwnerIntent('action_gif', action='bonk', target_user_id=20)))
-        fetch.assert_not_awaited()
-        message.channel.send.assert_not_awaited()
+        fetch.assert_awaited_once_with('bonk')
+        self.assertEqual(message.channel.send.await_args.args, (None,))
+        self.assertFalse(message.channel.send.await_args.kwargs['allowed_mentions'].users)
 
     async def test_owner_never_uses_guest_classifier(self):
         message = self.message('nixi serve tea', user_id=config.OWNER_ID)

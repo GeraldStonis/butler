@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 import re
 import time
 
@@ -202,8 +201,7 @@ class ChatCog(commands.Cog):
                 if message.author.id != config.OWNER_ID and routed_intent.name != "chat":
                     retry_after = self._guest_tools.update_rate_limit(message)
                     if retry_after:
-                        await message.reply(f"Please wait {math.ceil(retry_after)} seconds before another tool request.",
-                                            mention_author=False, allowed_mentions=discord.AllowedMentions.none())
+                        await actions.reply_discreetly(message, routed_intent.name, "tool_cooldown")
                         return
                 if routed_intent.name in {"trivia", "cards", "leaderboard"}:
                     games = self.bot.get_cog("ActivitiesCog")
@@ -217,7 +215,9 @@ class ChatCog(commands.Cog):
                                 log.exception("Could not start %s game", routed_intent.name)
                                 started = False
                             if not started:
-                                await message.reply("Game unavailable or already running here.", mention_author=False)
+                                await actions.reply_discreetly(message, routed_intent.name, "game_not_started")
+                    else:
+                        await actions.reply_discreetly(message, routed_intent.name, "activities_not_loaded")
                     return
                 execute = actions.execute_owner_intent if message.author.id == config.OWNER_ID else actions.execute_guest_intent
                 handled = await execute(message, routed_intent)

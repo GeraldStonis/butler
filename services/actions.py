@@ -7,14 +7,14 @@ import logging
 import discord
 
 import config
-from services import intent, media, search, memory, avatar_edits, database as db
+from services import intent, media, music, search, memory, avatar_edits, conversation, database as db
 from services.response_text import filter_links, requests_links
 
 log = logging.getLogger("nixi.actions")
 
 GUEST_ACTIONS = frozenset({
     "cat", "web_search", "news", "image_search", "gif_search", "meme",
-    "tea", "coffee", "action_gif",
+    "tea", "coffee", "action_gif", "song",
 })
 
 
@@ -24,6 +24,13 @@ def _media_embed(result: media.MediaResult) -> discord.Embed:
     if result.attribution:
         embed.set_footer(text=result.attribution)
     return embed
+
+
+async def reply_discreetly(message: discord.Message, kind: str, reason: str) -> None:
+    log.info("Continuing %s as conversation (%s)", kind, reason)
+    text = await conversation.discreet_reply(message.content, is_owner=message.author.id == config.OWNER_ID)
+    sent = await message.reply(text, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
+    await memory.log_delivery(sent)
 
 
 async def build_news_briefing(topic: str | None = None, *, include_links: bool = False) -> str:
@@ -59,26 +66,40 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
         return False
 
     try:
+        if name == "song":
+            song = await music.select_song(message.channel.id, owner_intent.query)
+            if not song:
+                await reply_discreetly(message, name, "no_matching_song")
+                return True
+            label = " - ".join(s for field in ("title", "artist")
+                               if isinstance(s := song.get(field), str) and s.strip())
+            label = discord.utils.escape_markdown(filter_links(label))[:250]
+            url = f"https://www.youtube.com/watch?v={song['youtubeId']}"
+            sent = await message.reply(f"{label}\n{url}".strip(), mention_author=False,
+                                       allowed_mentions=discord.AllowedMentions.none())
+            await memory.log_delivery(sent)
+            return True
+
         if name == "avatar_edit":
             if not message.guild:
-                await message.reply("Avatar caricatures are available in server chat only.", mention_author=False)
+                await reply_discreetly(message, name, "server_only")
                 return True
             member_id = owner_intent.target_user_id or message.author.id
             member = message.guild.get_member(member_id)
             if member is None or member.bot:
-                await message.reply("Choose a member of this server for the caricature.", mention_author=False)
+                await reply_discreetly(message, name, "unresolved_target")
                 return True
             if not await avatar_edits.permitted(message.guild.id, member.id):
-                await message.reply("That member has disabled avatar edits, roasting, or media.", mention_author=False)
+                await reply_discreetly(message, name, "member_boundary")
                 return True
             if not avatar_edits.ready():
-                await message.reply("Avatar editing needs its Cloudflare configuration enabled before I can render an image.", mention_author=False)
+                await reply_discreetly(message, name, "not_configured")
                 return True
             scene = owner_intent.action
             if owner_intent.query or scene not in avatar_edits.SCENES:
                 scene = await avatar_edits.prepare_owner_scene(owner_intent.query or message.content)
                 if scene is None:
-                    await message.reply("I couldn't prepare that as a nonsexual, all-ages cartoon scene. No image was generated.", mention_author=False)
+                    await reply_discreetly(message, name, "scene_not_prepared")
                     return True
             image = await avatar_edits.generate(message.guild.id, member, scene, owner_requested=True)
             if image:
@@ -87,9 +108,9 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
                     await memory.log_message(message.channel.id, message.guild.id, sent.author.id,
                                              "Nixi", f"[AI-edited avatar caricature delivered for member ID {member.id}]", is_bot=True)
                 else:
-                    await message.reply("The image wasn't delivered: preferences may have changed, or Discord rejected the attachment. Check Attach Files and Embed Links permissions.", mention_author=False)
+                    await reply_discreetly(message, name, "attachment_not_delivered")
             else:
-                await message.reply("Avatar editing is unavailable, cooling down, or out of budget. No image was posted.", mention_author=False)
+                await reply_discreetly(message, name, "no_image")
             return True
 
         if name == "cat":
@@ -97,30 +118,32 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             if result:
                 await message.reply(embed=_media_embed(result), mention_author=False)
             else:
-                await message.reply("Cat service returned no image. Try again shortly.", mention_author=False)
+                await reply_discreetly(message, name, "no_image")
             return True
 
         if name == "web_search":
             query = owner_intent.query or message.content
             results = await search.web_search(query, count=6)
-            await message.reply(
-                await search.summarize_results(query, results, include_links=requests_links(message.content)),
-                mention_author=False,
-            )
+            text = await search.summarize_results(query, results, include_links=requests_links(message.content))
+            if text:
+                await message.reply(text, mention_author=False)
+            else:
+                await reply_discreetly(message, name, "no_verified_results")
             return True
 
         if name == "news":
-            await message.reply(
-                await build_news_briefing(owner_intent.query or None, include_links=requests_links(message.content)),
-                mention_author=False,
-            )
+            text = await build_news_briefing(owner_intent.query or None, include_links=requests_links(message.content))
+            if text:
+                await message.reply(text, mention_author=False)
+            else:
+                await reply_discreetly(message, name, "no_verified_results")
             return True
 
         if name == "image_search":
             query = owner_intent.query or message.content
             result = await media.fetch_image(query)
             if not result:
-                await message.reply("I found no image fit for the household gallery.", mention_author=False)
+                await reply_discreetly(message, name, "no_image")
                 return True
             await message.reply(embed=_media_embed(result), mention_author=False)
             return True
@@ -129,10 +152,7 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             query = owner_intent.query or message.content
             result = await media.fetch_gif(query)
             if not result:
-                await message.reply(
-                    f"GIPHY returned no GIFs for '{filter_links(query)}'. Try a simpler search.",
-                    mention_author=False,
-                )
+                await reply_discreetly(message, name, "no_gif")
                 return True
             await message.reply(embed=_media_embed(result), mention_author=False)
             return True
@@ -140,18 +160,16 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
         if name in {"meme", "captioned_gif"}:
             if name == "captioned_gif":
                 if not config.IMGFLIP_API_KEY:
-                    await message.reply("Captioned GIFs need IMGFLIP_API_KEY configured in Railway Variables.", mention_author=False)
+                    await reply_discreetly(message, name, "not_configured")
                     return True
                 if not config.IMGFLIP_GIF_CAPTIONS_ENABLED:
-                    await message.reply("Captioned GIFs use Imgflip API Premium. They are disabled to avoid charges; enable IMGFLIP_GIF_CAPTIONS_ENABLED only with Premium approval.", mention_author=False)
+                    await reply_discreetly(message, name, "paid_generation_disabled")
                     return True
                 result = await media.fetch_captioned_gif(owner_intent.query or message.content)
             else:
                 result = await media.fetch_meme()
             if not result:
-                text = ("No new captioned GIF available: the provider or daily limit may be unavailable. No image was posted."
-                        if name == "captioned_gif" else "No new meme available right now. I'll skip the reruns.")
-                await message.reply(text, mention_author=False)
+                await reply_discreetly(message, name, "no_new_media")
                 return True
             sent = await message.reply(filter_links(result.title[:2000], requests_links(message.content)) or None, embed=_media_embed(result), mention_author=False)
             await memory.log_message(
@@ -167,7 +185,7 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
         if name in {"tea", "coffee"}:
             result = await media.fetch_tea_or_coffee(name)
             if not result:
-                await message.reply(f"GIPHY returned no {name}-serving GIFs. Try me again in a moment.", mention_author=False)
+                await reply_discreetly(message, name, "no_gif")
                 return True
             label = "Tea service" if name == "tea" else "Coffee service"
             await message.reply(f"{label}, as requested.", embed=_media_embed(result), mention_author=False)
@@ -177,43 +195,37 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             target_id = owner_intent.target_user_id
             member = message.guild.get_member(target_id) if message.guild and target_id else None
             mentioned_ids = {user.id for user in getattr(message, "mentions", [])}
-            if member is None or member.bot or member.id not in mentioned_ids:
-                await message.reply("Mention a member of this server for a reaction GIF.", mention_author=False)
-                return True
+            if member is not None and (member.bot or member.id != target_id or member.id not in mentioned_ids):
+                member = None
             if not owner_intent.action:
-                await message.reply("Tell me the action for that reaction GIF.", mention_author=False)
+                await reply_discreetly(message, name, "unresolved_action")
                 return True
-            preferences = await db.get_member_preferences(message.guild.id, member.id)
-            if not preferences["media"] or not is_owner and not preferences["roasting"]:
-                await message.reply("That member has opted out of targeted media or teasing.", mention_author=False)
+            preferences = await db.get_member_preferences(message.guild.id, member.id) if member else {}
+            if member and (not preferences["media"] or not is_owner and not preferences["roasting"]):
+                await reply_discreetly(message, name, "member_boundary")
                 return True
             result = await media.fetch_action_gif(owner_intent.action)
             if not result:
-                await message.reply(
-                    "I could not find a suitable reaction GIF. For now, consider this a stern eyebrow.",
-                    mention_author=False,
-                )
+                await reply_discreetly(message, name, "no_gif")
                 return True
             # Recheck comfort settings after waiting on the GIF provider.
-            preferences = await db.get_member_preferences(message.guild.id, member.id)
-            if not preferences["media"] or not is_owner and not preferences["roasting"]:
-                await message.reply("That member has opted out of targeted media or teasing.", mention_author=False)
+            preferences = await db.get_member_preferences(message.guild.id, member.id) if member else {}
+            if member and (not preferences["media"] or not is_owner and not preferences["roasting"]):
+                await reply_discreetly(message, name, "member_boundary")
                 return True
             sent = await message.channel.send(
-                f"<@{member.id}>",
+                f"<@{member.id}>" if member else None,
                 embed=_media_embed(result),
                 allowed_mentions=discord.AllowedMentions(everyone=False, roles=False,
-                    users=[discord.Object(id=member.id)] if preferences["pings"] else [], replied_user=False),
+                    users=[discord.Object(id=member.id)] if member and preferences["pings"] else [], replied_user=False),
             )
             await memory.log_delivery(sent)
             return True
 
-    except Exception:
-        log.exception("Natural language action failed: %s", name)
-        await message.reply(
-            "I attempted the errand and tripped over the carpet. Do try me again in a moment.",
-            mention_author=False,
-        )
+    except Exception as exc:
+        status = getattr(getattr(exc, "response", None), "status_code", None) or getattr(exc, "status", None)
+        log.error("Natural language action failed: %s (%s, HTTP %s)", name, type(exc).__name__, status)
+        await reply_discreetly(message, name, "exception")
         return True
 
     return False

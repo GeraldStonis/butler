@@ -38,10 +38,18 @@ The key design rule is simple:
 - Targeted social actions search for an existing matching GIF and send an image
   embed with the member's tag, never an AI caricature or a visible GIF URL.
   Handshakes, punches, kisses, kicks, hugs, pats, high-fives, fist bumps and similar
-  requests use this path. A missing target prompts for a real server-member
-  mention; a failed GIF search does not fall back to AI image generation.
+  requests use this path. Mentions are optional: without a confirmed target,
+  Nixi posts the GIF without a tag, including in DMs. He does not demand a mention
+  or guess a random recipient. A failed GIF search never becomes an AI image.
   Explicit avatar/drawing requests remain separate, and no-pings preferences
   suppress notifications without removing the visible tag.
+- Public service replies stay in character. Provider failures, missing settings,
+  empty results and tool cooldowns are logged privately rather than announced
+  in chat. Nixi generates a fresh, short reaction without blaming the requester,
+  exposing member preferences or claiming an undelivered image exists. That
+  reaction has an eight-second deadline and falls back to a quiet emoji if the
+  model is also unavailable. Search/news failures do not invent current facts,
+  and scheduled news skips empty briefings.
 - Owner-only avatar requests:
   - "nixi edit @user's avatar into a maid outfit"
   - "hey nixi can you make @user eat grass in a field"
@@ -410,6 +418,15 @@ invented independently: no server conversation is sent to these image APIs.
 The new public APIs need no extra keys; caption writing uses the existing LLM.
 
 Music uses your `songs_data.json` playlist (`songs.json` is accepted as a fallback).
+Ask naturally: "nixi play a song", "nixi send some music", "nixi play Apocalypse",
+or "nixi play a song by The Police". Guests can request songs too. Requests select
+from the file by title, artist, or category, not invented links or an external music
+API. An unknown title is never silently replaced by an unrelated song. Requests
+bypass idle timing, quiet hours and the lottery; `MUSIC_DROP_ENABLED` and
+`MUSIC_CHANNEL_IDS` control only unsolicited drops. Song history is shared between
+requested and idle posts, persists across restarts, and avoids the last 20 songs
+when possible. Explicitly requesting a particular track allows replaying it.
+
 Video IDs are validated and duplicate playlist entries are collapsed. Once a channel
 has had no human activity for a randomly chosen 10-15 minutes, Nixi gets exactly
 one 10% chance to post a song. It does not reroll every timer tick. Human messages

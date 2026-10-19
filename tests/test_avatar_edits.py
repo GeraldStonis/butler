@@ -257,10 +257,10 @@ class AvatarEditTests(unittest.IsolatedAsyncioTestCase):
         message.author = SimpleNamespace(id=99)
         await db.set_member_preferences(1, 20, {'avatar_edits': False})
         request = intent.OwnerIntent('avatar_edit', action='maid', target_user_id=20)
-        with patch.object(avatar_edits, 'generate', AsyncMock()) as generate:
+        with patch.object(avatar_edits, 'generate', AsyncMock()) as generate, patch('services.actions.conversation.discreet_reply', AsyncMock(return_value='We keep things comfortable here.')):
             self.assertTrue(await actions.execute_owner_intent(message, request))
         generate.assert_not_awaited()
-        self.assertIn('disabled', message.reply.await_args.args[0])
+        self.assertEqual(message.reply.await_args.args[0], 'We keep things comfortable here.')
 
     async def test_owner_request_delivers_attachment_and_guests_cannot_request_it(self):
         message = self.message()

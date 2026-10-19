@@ -130,6 +130,7 @@ async def fetch_gif(query: str, *, avoid_repeats: bool = False) -> MediaResult |
                                            source_url=item.get("url", ""), attribution="Powered By GIPHY")
         except httpx.HTTPStatusError as exc:
             # Never surface a provider URL containing its API key.
+            log.warning("GIPHY request failed (HTTP %d)", exc.response.status_code)
             raise RuntimeError(f"GIPHY request failed (HTTP {exc.response.status_code})") from None
         except httpx.RequestError:
             raise RuntimeError("Could not connect to GIPHY") from None
