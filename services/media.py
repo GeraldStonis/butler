@@ -48,6 +48,21 @@ async def fetch_meme() -> MediaResult | None:
         return None
 
 
+async def fetch_captioned_gif(topic: str = "") -> MediaResult | None:
+    """Render an original animated template only when paid captioning is enabled."""
+    if (not config.IMGFLIP_API_KEY or not config.IMGFLIP_GIF_CAPTIONS_ENABLED
+            or config.IMGFLIP_GIF_DAILY_LIMIT <= 0):
+        return None
+    if not isinstance(topic, str) or re.search(r"https?://|<@|@everyone|@here", topic, re.I):
+        return None
+    try:
+        from services.generated_memes import create_meme
+        return await asyncio.wait_for(create_meme(animated=True, topic=topic[:300]), timeout=60)
+    except asyncio.TimeoutError:
+        log.warning("No new captioned GIF within the generation time budget")
+        return None
+
+
 def _meme_url_key(url: str) -> str:
     parts = urlsplit(url)
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path, "", ""))

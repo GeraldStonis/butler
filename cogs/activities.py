@@ -138,7 +138,7 @@ class ActivitiesCog(commands.Cog):
     async def start_game(self, channel, kind, *, requester_id=None, autonomous=False):
         if not config.ACTIVITIES_ENABLED or not getattr(channel, "guild", None):
             return False
-        if not autonomous and requester_id != config.OWNER_ID:
+        if not autonomous and (requester_id is None or channel.guild.get_member(requester_id) is None):
             return False
         async with self._start_lock:
             if channel.id in self.active:

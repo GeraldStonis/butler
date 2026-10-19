@@ -50,6 +50,7 @@ OWNER_ALIASES: list[str] = _list_env(
 # Backward-compatible name used by older code.
 OWNER_NAMES: list[str] = OWNER_ALIASES
 OWNER_AWAY_AFTER_SECONDS: int = int(os.environ.get("OWNER_AWAY_AFTER_SECONDS", "300"))
+# Legacy name: enables public natural-language tools as well as owner tools.
 ENABLE_NATURAL_OWNER_ACTIONS: bool = _bool_env("ENABLE_NATURAL_OWNER_ACTIONS", True)
 
 # LLM (Ollama Cloud)
@@ -76,6 +77,10 @@ TAVILY_API_KEY: str = os.environ.get("TAVILY_API_KEY", "")
 BRAVE_SEARCH_API_KEY: str = os.environ.get("BRAVE_SEARCH_API_KEY", "")
 TENOR_API_KEY: str = os.environ.get("TENOR_API_KEY", "")
 GIPHY_API_KEY: str = os.environ.get("GIPHY_API_KEY", "")
+IMGFLIP_API_KEY: str = os.environ.get("IMGFLIP_API_KEY", "").strip()
+# Animated captioning is a paid Imgflip endpoint and requires explicit opt-in.
+IMGFLIP_GIF_CAPTIONS_ENABLED: bool = _bool_env("IMGFLIP_GIF_CAPTIONS_ENABLED", False)
+IMGFLIP_GIF_DAILY_LIMIT: int = max(0, int(os.environ.get("IMGFLIP_GIF_DAILY_LIMIT", "3")))
 MEDIA_SAFE_MODE: bool = _bool_env("MEDIA_SAFE_MODE", True)
 AUTOMATIC_MEDIA_ENABLED: bool = _bool_env("AUTOMATIC_MEDIA_ENABLED", True)
 AUTOMATIC_MEDIA_COOLDOWN_SECONDS: int = max(0, int(os.environ.get("AUTOMATIC_MEDIA_COOLDOWN_SECONDS", "45")))

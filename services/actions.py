@@ -1,4 +1,4 @@
-"""Execution for owner-only natural language actions."""
+"""Natural language actions with explicit public and owner-only permissions."""
 
 from __future__ import annotations
 
@@ -7,10 +7,15 @@ import logging
 import discord
 
 import config
-from services import intent, media, search, memory, avatar_edits
+from services import intent, media, search, memory, avatar_edits, database as db
 from services.response_text import filter_links, requests_links
 
 log = logging.getLogger("nixi.actions")
+
+GUEST_ACTIONS = frozenset({
+    "cat", "web_search", "news", "image_search", "gif_search", "meme",
+    "tea", "coffee", "action_gif",
+})
 
 
 def _media_embed(result: media.MediaResult) -> discord.Embed:
@@ -32,13 +37,23 @@ async def execute_owner_intent(
     message: discord.Message,
     owner_intent: intent.OwnerIntent,
 ) -> bool:
-    """
-    Execute an owner-only intent.
-
-    Returns True when an action was handled and normal chat should stop.
-    """
-    name = owner_intent.name
+    """Owner entry point; never trusts a display name or classifier result."""
     if message.author.id != config.OWNER_ID:
+        return False
+    return await _execute_intent(message, owner_intent)
+
+
+async def execute_guest_intent(message: discord.Message, guest_intent: intent.OwnerIntent) -> bool:
+    """Guests can use public tools, never paid edits or administrative tools."""
+    if guest_intent.name not in GUEST_ACTIONS:
+        return False
+    return await _execute_intent(message, guest_intent)
+
+
+async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIntent) -> bool:
+    name = owner_intent.name
+    is_owner = message.author.id == config.OWNER_ID
+    if not is_owner and name not in GUEST_ACTIONS:
         return False
     if name == "chat":
         return False
@@ -122,10 +137,21 @@ async def execute_owner_intent(
             await message.reply(embed=_media_embed(result), mention_author=False)
             return True
 
-        if name == "meme":
-            result = await media.fetch_meme()
+        if name in {"meme", "captioned_gif"}:
+            if name == "captioned_gif":
+                if not config.IMGFLIP_API_KEY:
+                    await message.reply("Captioned GIFs need IMGFLIP_API_KEY configured in Railway Variables.", mention_author=False)
+                    return True
+                if not config.IMGFLIP_GIF_CAPTIONS_ENABLED:
+                    await message.reply("Captioned GIFs use Imgflip API Premium. They are disabled to avoid charges; enable IMGFLIP_GIF_CAPTIONS_ENABLED only with Premium approval.", mention_author=False)
+                    return True
+                result = await media.fetch_captioned_gif(owner_intent.query or message.content)
+            else:
+                result = await media.fetch_meme()
             if not result:
-                await message.reply("No new meme available right now. I'll skip the reruns.", mention_author=False)
+                text = ("No new captioned GIF available: the provider or daily limit may be unavailable. No image was posted."
+                        if name == "captioned_gif" else "No new meme available right now. I'll skip the reruns.")
+                await message.reply(text, mention_author=False)
                 return True
             sent = await message.reply(filter_links(result.title[:2000], requests_links(message.content)) or None, embed=_media_embed(result), mention_author=False)
             await memory.log_message(
@@ -133,7 +159,7 @@ async def execute_owner_intent(
                 guild_id=message.guild.id if message.guild else None,
                 author_id=sent.author.id,
                 author_name="Nixi",
-                content=f"[Meme delivered as a Discord image embed: {result.title[:500]}]",
+                content=f"[{'Captioned GIF' if name == 'captioned_gif' else 'Meme'} delivered as a Discord image embed: {result.title[:500]}]",
                 is_bot=True,
             )
             return True
@@ -148,6 +174,19 @@ async def execute_owner_intent(
             return True
 
         if name == "action_gif":
+            target_id = owner_intent.target_user_id
+            notify_target = bool(target_id)
+            if not is_owner:
+                member = message.guild.get_member(target_id) if message.guild and target_id else None
+                mentioned_ids = {user.id for user in getattr(message, "mentions", [])}
+                if member is None or member.bot or member.id not in mentioned_ids:
+                    await message.reply("Mention a member of this server for a reaction GIF.", mention_author=False)
+                    return True
+                preferences = await db.get_member_preferences(message.guild.id, member.id)
+                if not preferences["media"] or not preferences["roasting"]:
+                    await message.reply("That member has opted out of targeted media or teasing.", mention_author=False)
+                    return True
+                notify_target = preferences["pings"]
             result = await media.fetch_action_gif(owner_intent.action)
             target = f"<@{owner_intent.target_user_id}>" if owner_intent.target_user_id else "the intended party"
             if not result:
@@ -157,15 +196,16 @@ async def execute_owner_intent(
                 )
                 return True
             await message.channel.send(
-                f"{target}, the Young Master has requested a little slapstick diplomacy.",
+                (f"{target}, the Young Master has requested a little slapstick diplomacy."
+                 if is_owner else target),
                 embed=_media_embed(result),
                 allowed_mentions=discord.AllowedMentions(everyone=False, roles=False,
-                    users=[discord.Object(id=owner_intent.target_user_id)] if owner_intent.target_user_id else [], replied_user=False),
+                    users=[discord.Object(id=target_id)] if notify_target else [], replied_user=False),
             )
             return True
 
     except Exception:
-        log.exception("Owner action failed: %s", owner_intent)
+        log.exception("Natural language action failed: %s", name)
         await message.reply(
             "I attempted the errand and tripped over the carpet. Do try me again in a moment.",
             mention_author=False,

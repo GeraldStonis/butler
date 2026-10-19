@@ -71,12 +71,24 @@ class NewActivitiesTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(question['question'], 'What is "tea"?')
             self.assertIsNone(await activities.trivia_question())
 
-    async def test_guests_cannot_start_games(self):
+    async def test_game_start_requires_a_real_server_member(self):
         cog = ActivitiesCog(SimpleNamespace())
-        channel = SimpleNamespace(guild=SimpleNamespace(id=1), id=2)
+        channel = SimpleNamespace(guild=SimpleNamespace(id=1, get_member=lambda _: None), id=2)
         with patch.object(config, 'OWNER_ID', 99), patch.object(activities, 'draw_cards', AsyncMock()) as draw:
             self.assertFalse(await cog.start_game(channel, 'cards', requester_id=3))
             draw.assert_not_called()
+
+    async def test_guest_can_start_one_game_when_activities_are_enabled(self):
+        cog = ActivitiesCog(SimpleNamespace())
+        channel = SimpleNamespace(guild=SimpleNamespace(id=1, get_member=lambda _: SimpleNamespace(id=3)),
+                                  id=2, send=AsyncMock(return_value=SimpleNamespace(id=10)))
+        data = {'category': 'General', 'question': 'Q', 'answers': ['A', 'B'], 'correct': 0}
+        with patch.object(config, 'ACTIVITIES_ENABLED', True), patch.object(activities, 'trivia_question', AsyncMock(return_value=data)), patch.object(activities, 'commentary', AsyncMock(return_value='')), patch('cogs.activities.memory.log_delivery', AsyncMock()):
+            try:
+                self.assertTrue(await cog.start_game(channel, 'trivia', requester_id=3))
+                self.assertFalse(await cog.start_game(channel, 'trivia', requester_id=4))
+            finally:
+                cog.cog_unload()
 
     async def test_each_user_votes_once_and_correct_score_settles_once(self):
         cog = ActivitiesCog(SimpleNamespace())

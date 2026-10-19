@@ -9,10 +9,13 @@ engineering tradeoffs, read the [project walkthrough](PROJECT_WALKTHROUGH.md).
 The key design rule is simple:
 
 - Everyone can chat with Nixi when they address him.
-- Guests can ask questions; explicit performance, media, roleplay, and errand
-  commands receive varied short, sassy refusals instead of being carried out.
-- Only `OWNER_ID` can make Nixi perform actions such as search, news, media,
-  GIFs, memes, or targetted reaction GIFs.
+- Guests can request ordinary help, writing, translations, jokes, media, searches,
+  news and available games. Serving a guest does not make them the owner.
+- Requests to change Nixi's identity, replace Sir Ronix, claim delegated authority,
+  override rules or expose private information receive fresh, sassy refusals.
+- Only `OWNER_ID` can change persistent instructions, reset memory, use admin
+  utilities, request avatar edits or request paid GIF captioning. Paid GIF
+  captioning remains disabled unless separately enabled with Premium approval.
 
 ## Current Features
 
@@ -23,15 +26,20 @@ The key design rule is simple:
   casual replies reduce recycled lines. Serious questions and explanations keep their
   substance instead of being rewritten merely for novelty. No guarantee that a model
   will never repeat itself, but repeated output is now checked, not just discouraged.
-- Owner-only natural language actions:
+- Natural language actions for everyone who addresses Nixi:
   - "nixi get me the morning news"
   - "nixi search latest cybersecurity news"
   - "nixi send a meme"
   - "nixi send coffee"
   - "nixi find an image of ..."
   - "nixi punch @user"
+- Owner-only avatar requests:
   - "nixi edit @user's avatar into a maid outfit"
   - "hey nixi can you make @user eat grass in a field"
+- Guest tool requests have a 30-second per-member, per-server cooldown; normal
+  conversation and writing are not limited by that tool cooldown. Targeted guest
+  reaction GIFs require a real mention and respect the target's media, roasting
+  and notification preferences. Requests do not grant access to owner utilities.
 - Owner availability handling:
   - If someone mentions the owner while the owner has been inactive for more
     than `OWNER_AWAY_AFTER_SECONDS`, Nixi replies that the owner is unavailable.
@@ -43,8 +51,10 @@ The key design rule is simple:
   sends the same server's available `kidhar chali` sticker in that channel.
   Spaces, underscores, hyphens, and capitalization in the sticker name are ignored.
 - Random meme drops every 4-6 minutes by default, independently of chat replies.
-  Memes now use [memegen.link](https://api.memegen.link/docs/), with fresh LLM-written
-  captions instead of the repeated Reddit random feed. All meme paths share a
+  Memes use [Imgflip](https://imgflip.com/api) when `IMGFLIP_API_KEY` is configured,
+  with [memegen.link](https://api.memegen.link/docs/) as a free static-image fallback.
+  Captions are freshly written by the existing LLM, not a repeated Reddit feed.
+  All meme paths share a
   persistent SQLite history: normalized caption duplicates, image URL duplicates
   and identical image bytes are rejected. Candidates are reserved atomically,
   so concurrent requests do not reuse them. No new candidate means no rerun.
@@ -64,7 +74,7 @@ The key design rule is simple:
   recent queries; automatic searches skip GIF IDs already selected in SQLite,
   including across restarts. Empty/repeated results trigger a fresh search phrase.
   Automatic searches also try up to three ranked result pages when earlier pages
-  have been exhausted. Direct owner requests keep the first-result behavior.
+  have been exhausted. Direct requests keep the first-result behavior.
   Automatic media gets 12 seconds; if delayed, Nixi sends the text without it.
   The LLM can choose an embed-only reply when the GIF itself is the punchline.
 - Bot watcher rules for alerts from other bots.
@@ -82,7 +92,8 @@ run through the conversational style policy.
 
 The persona mirrors the current speaker's language, rhythm, formality, and slang,
 including natural AAVE-influenced phrasing when it fits. It does not infer a
-member's identity or turn tone matching into permission to execute guest orders.
+member's identity or turn tone matching into permission to change allegiance,
+override Nixi's identity or access owner-only tools. Ordinary requests are welcome.
 Slang calibration examples include terms documented by
 [Oxford Languages](https://corp.oup.com/word-of-the-year/), but they are not canned
 replies or a live trend feed. New usage comes from the conversation; the bot is
@@ -228,6 +239,7 @@ TAVILY_API_KEY=
 BRAVE_SEARCH_API_KEY=
 TENOR_API_KEY=
 GIPHY_API_KEY=
+IMGFLIP_API_KEY=
 ```
 
 Tavily powers web/news/image search. Brave is an optional legacy alternative
@@ -235,6 +247,43 @@ used when Tavily is not configured. GIPHY powers GIFs and action GIFs;
 Tenor is a legacy fallback when GIPHY is not configured.
 GIPHY messages include attribution. Its standard API documentation requires
 client-side searches; contact GIPHY about approval for this server-side bot integration.
+
+### Imgflip Captions
+
+Set `IMGFLIP_API_KEY` in local `.env` and separately in Railway Variables.
+Imgflip uses Bearer-token authentication; no username or password is needed.
+The static `/caption_image` endpoint is free with its normal watermark, which
+Nixi keeps. GPT-OSS writes the captions, and Imgflip renders them on a matching
+template. Requests, scheduled meme drops, and independently selected meme replies
+all use this renderer. Missing credentials or provider failure keep the existing
+memegen fallback available. Caption, URL, and image-byte duplicate checks share
+the existing SQLite history, including captions from the old renderer.
+
+The integration sends template IDs and caption text, not raw chat transcripts,
+avatars, or uploaded GIF files. Rendered images are publicly accessible through
+their returned URLs and are embedded in Discord without printing those URLs.
+Only reviewed template IDs are offered when `MEDIA_SAFE_MODE=true`.
+
+Paid animated captioning is implemented but disabled by default and is not
+needed for static memes:
+
+```env
+IMGFLIP_GIF_CAPTIONS_ENABLED=false
+IMGFLIP_GIF_DAILY_LIMIT=3
+```
+
+Keep that switch false for free static memes only. Imgflip's `/caption_gif`
+requires API Premium and may charge per request; Nixi never enables it merely
+because a key is present. If explicitly enabled, Ronix can naturally request
+`nixi make a captioned gif about lag`, and Nixi may choose a captioned GIF for
+its own playful replies. Attempts, including failures and cancellations after
+reservation, count toward the persistent per-UTC-day application cap. This cap
+is not a guarantee against subscription or usage charges. No paid search,
+AI-caption, watermark-removal, or template-upload endpoints are used.
+See [Imgflip's API documentation](https://imgflip.com/api) for its current terms.
+
+Imgflip does not replace GIPHY for ordinary reaction GIF searches, tea/coffee
+serving, or action GIFs. Those still require a valid `GIPHY_API_KEY`.
 
 ## Important Config
 
@@ -264,7 +313,7 @@ the latest channel message. Any human message resets the sequence. Bot messages
 do not reset it. State survives restarts; the old fixed cooldown setting is ignored.
 At most five unanswered nudges are sent (5, 10, 20, 40, 80 minute waits at the
 default setting), then nudging stops until a human speaks. Nudge wording and
-guest-command refusals are generated afresh by the LLM, using stored lines only
+protected-request refusals are generated afresh by the LLM, using stored lines only
 as examples and avoiding the previous reply. Generation failure skips the reply
 instead of selecting a canned fallback.
 

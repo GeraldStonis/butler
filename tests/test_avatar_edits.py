@@ -246,7 +246,7 @@ class AvatarEditTests(unittest.IsolatedAsyncioTestCase):
         cog._detect_mode = AsyncMock(return_value='DIRECT_ADDRESS')
         cog._avatar_reaction = AsyncMock(return_value=PNG)
         message = self.message('nixi say uwu')
-        with patch('cogs.chat.memory.log_message', AsyncMock()) as logged, patch('cogs.chat.social.classify_guest_message', AsyncMock(return_value='command')), patch.object(cog, '_guest_retort', AsyncMock(return_value='Your command has been declined.')):
+        with patch('cogs.chat.memory.log_message', AsyncMock()) as logged, patch('cogs.chat.social.classify_guest_message', AsyncMock(return_value='protected')), patch.object(cog, '_guest_retort', AsyncMock(return_value='Your command has been declined.')):
             await cog._handle_message(message)
         self.assertIn('file', message.reply.await_args.kwargs)
         self.assertIn('avatar caricature delivered', logged.await_args.kwargs['content'])
@@ -365,7 +365,7 @@ class AvatarEditTests(unittest.IsolatedAsyncioTestCase):
         message = self.message('nixi say uwu')
         response = SimpleNamespace(status=403, reason='Forbidden')
         message.reply.side_effect = [discord.Forbidden(response, 'Missing Attach Files permission'), SimpleNamespace()]
-        with patch('cogs.chat.memory.log_message', AsyncMock()) as logged, patch('cogs.chat.social.classify_guest_message', AsyncMock(return_value='command')), patch.object(cog, '_guest_retort', AsyncMock(return_value='Your command has been declined.')), self.assertLogs('nixi.avatar_edits', level='WARNING'):
+        with patch('cogs.chat.memory.log_message', AsyncMock()) as logged, patch('cogs.chat.social.classify_guest_message', AsyncMock(return_value='protected')), patch.object(cog, '_guest_retort', AsyncMock(return_value='Your command has been declined.')), self.assertLogs('nixi.avatar_edits', level='WARNING'):
             await cog._handle_message(message)
         self.assertEqual(message.reply.await_count, 2)
         self.assertNotIn('file', message.reply.await_args.kwargs)

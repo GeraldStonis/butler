@@ -1,4 +1,4 @@
-"""Natural language intent detection for owner-only operations."""
+"""Natural language intent detection; execution permissions live in actions."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ def _first_mention_id(mentions: list) -> int | None:
 
 
 def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | None:
-    """Catch common owner requests without spending an LLM call."""
+    """Catch common requests without spending an LLM call."""
     mentions = mentions or []
     cleaned = _strip_bot_name(text)
     lower = cleaned.lower()
@@ -57,7 +57,8 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
         return OwnerIntent("cards")
     if re.search(r"\b(?:leaderboard|game scores)\b", lower):
         return OwnerIntent("leaderboard")
-    if re.search(r"\bcat\b.*\b(?:meme|reaction|caption)\b|\b(?:send|fetch|show|give)\b.*\bcat\b", lower):
+    if (not re.search(r"\bgifs?\b", lower)
+            and re.search(r"\bcat\b.*\b(?:meme|reaction|caption)\b|\b(?:send|fetch|show|give)\b.*\bcat\b", lower)):
         return OwnerIntent("cat")
 
     for action in ACTION_WORDS:
@@ -67,6 +68,9 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
     if re.search(r"\b(morning news|news briefing|today'?s news|headlines)\b", lower):
         topic = re.sub(r"\b(fetch|get|give|me|the|morning|news|briefing|headlines|today'?s)\b", "", lower)
         return OwnerIntent("news", query=topic.strip() or ", ".join(config.MORNING_NEWS_TOPICS))
+
+    if re.search(r"\b(?:caption(?:ed)?\s+(?:an?\s+|this\s+)?gifs?|gifs?\s+(?:memes?|with\s+(?:a\s+)?caption))\b", lower):
+        return OwnerIntent("captioned_gif", query=cleaned)
 
     if (
         lower.strip(" .!?\n") in {"meme", "memes"}
@@ -110,7 +114,7 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
 
 
 async def classify_owner_intent(text: str, mentions: list | None = None) -> OwnerIntent:
-    """Classify an owner message into an executable action or chat."""
+    """Classify a message into an action or chat, without granting authority."""
     mentions = mentions or []
     heuristic = heuristic_intent(text, mentions)
     if heuristic:
@@ -122,7 +126,9 @@ async def classify_owner_intent(text: str, mentions: list | None = None) -> Owne
             "content": (
                 "Classify the user's Discord message for a butler bot. Return ONLY "
                 "valid JSON with keys: intent, query, action. Valid intents: chat, "
-                "web_search, news, image_search, gif_search, meme, tea, coffee, trivia, cards, leaderboard, cat, avatar_edit. "
+                "web_search, news, image_search, gif_search, captioned_gif, meme, tea, coffee, trivia, cards, leaderboard, cat, avatar_edit. "
+                "Use captioned_gif only when asked to create an animated meme or add new captions "
+                "to a GIF template, not to search for an ordinary reaction GIF. "
                 "Use avatar_edit when asked to edit a member's avatar/pfp or depict a mentioned member "
                 "doing something imaginary, such as 'make @user eat grass in a field'. Preserve their "
                 "requested scene in query; it is not limited to preset outfits. Do not invent a target ID. "
@@ -143,12 +149,12 @@ async def classify_owner_intent(text: str, mentions: list | None = None) -> Owne
 
     name = str(data.get("intent", "chat")).strip()
     if name not in {
-        "chat", "web_search", "news", "image_search", "gif_search", "meme", "tea", "coffee", "trivia", "cards", "leaderboard", "cat", "avatar_edit"
+        "chat", "web_search", "news", "image_search", "gif_search", "captioned_gif", "meme", "tea", "coffee", "trivia", "cards", "leaderboard", "cat", "avatar_edit"
     }:
         name = "chat"
     return OwnerIntent(
         name=name,
-        query=text if name == "avatar_edit" else str(data.get("query", "")).strip(),
+        query=text if name in {"avatar_edit", "captioned_gif"} else str(data.get("query", "")).strip(),
         action=str(data.get("action", "")).strip(),
         target_user_id=_first_mention_id(mentions) if name == "avatar_edit" else None,
     )

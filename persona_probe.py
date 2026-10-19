@@ -31,7 +31,7 @@ async def probe() -> None:
             ):
                 await db.save_message(1, 1, guest_id, "Synthetic Guest", text)
                 kind = await social.classify_guest_message(text)
-                if kind == "command":
+                if kind == "protected":
                     reply = await social.generate_guest_retort(text)
                 else:
                     context = await memory.build_context(1, text, "Synthetic Guest", "DIRECT_ADDRESS",

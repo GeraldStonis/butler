@@ -10,6 +10,7 @@ from services import database as db, media, generated_memes
 class MemeUniquenessTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         await db.close()
+        self.enterContext(patch.object(config, 'IMGFLIP_API_KEY', ''))
         self.path_patch = patch.object(config, 'DB_PATH', ':memory:')
         self.path_patch.start()
         await db.get_db()
