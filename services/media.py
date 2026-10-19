@@ -27,10 +27,23 @@ class MediaResult:
 
 
 SAFE_ACTION_QUERIES = {
+    "handshake": "funny handshake gif",
+    "high_five": "funny high five gif",
+    "fist_bump": "funny fist bump gif",
+    "pat": "wholesome head pat gif",
     "punch": "funny cartoon punch gif",
     "bonk": "funny bonk gif",
     "slap": "funny cartoon slap gif",
     "hug": "wholesome hug gif",
+    "kiss": "wholesome kiss gif",
+    "kick": "funny cartoon kick gif",
+    "boop": "cute boop gif",
+    "poke": "funny poke gif",
+    "cuddle": "wholesome cuddle gif",
+    "tickle": "funny tickle gif",
+    "wave": "friendly wave gif",
+    "yeet": "funny cartoon yeet gif",
+    "smack": "funny cartoon smack gif",
     "glare": "dramatic glare gif",
     "stare": "dramatic stare gif",
     "tea": "tea serving",
@@ -166,7 +179,9 @@ async def fetch_tea_or_coffee(kind: str) -> MediaResult | None:
 
 
 async def fetch_action_gif(action: str) -> MediaResult | None:
-    """Fetch a safe action GIF for targetted owner commands."""
+    """Search existing GIFs for a social action, never generate an avatar edit."""
     normalized = action.lower().strip()
-    query = SAFE_ACTION_QUERIES.get(normalized, f"funny {normalized} gif")
+    if not 1 <= len(normalized) <= 60 or re.search(r"https?://|<[^>]*>|@|[\r\n]", normalized, re.I):
+        return None
+    query = SAFE_ACTION_QUERIES.get(normalized, f"funny {normalized.replace('_', ' ')} gif")
     return await fetch_gif(query)

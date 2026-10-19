@@ -33,6 +33,15 @@ The key design rule is simple:
   - "nixi send coffee"
   - "nixi find an image of ..."
   - "nixi punch @user"
+  - "nixi give @user a handshake"
+  - "nixi hug @user" / "nixi kiss @user" / "nixi pat @user"
+- Targeted social actions search for an existing matching GIF and send an image
+  embed with the member's tag, never an AI caricature or a visible GIF URL.
+  Handshakes, punches, kisses, kicks, hugs, pats, high-fives, fist bumps and similar
+  requests use this path. A missing target prompts for a real server-member
+  mention; a failed GIF search does not fall back to AI image generation.
+  Explicit avatar/drawing requests remain separate, and no-pings preferences
+  suppress notifications without removing the visible tag.
 - Owner-only avatar requests:
   - "nixi edit @user's avatar into a maid outfit"
   - "hey nixi can you make @user eat grass in a field"
@@ -108,7 +117,7 @@ Cloudflare Workers AI's FLUX.2 klein 4B edits a static 256px Discord avatar into
 an obviously fictional, fully clothed cartoon. Automatic comebacks choose from
 a modest maid outfit, donkey ride, tiny throne, or clown costume. Ronix can
 request other playful scenes naturally, such as `hey nixi can you make @user
-eat grass in a field`. GPT-OSS prepares a bounded visual description preserving
+eat grass in a field`. The configured model prepares a bounded visual description preserving
 the requested action and setting; Python resolves the actual Discord mention.
 The result is attached with a tag for that member, not a visible image URL.
 Only the target can be notified, and their no-pings preference suppresses that
@@ -253,7 +262,7 @@ client-side searches; contact GIPHY about approval for this server-side bot inte
 Set `IMGFLIP_API_KEY` in local `.env` and separately in Railway Variables.
 Imgflip uses Bearer-token authentication; no username or password is needed.
 The static `/caption_image` endpoint is free with its normal watermark, which
-Nixi keeps. GPT-OSS writes the captions, and Imgflip renders them on a matching
+Nixi keeps. The configured model writes the captions, and Imgflip renders them on a matching
 template. Requests, scheduled meme drops, and independently selected meme replies
 all use this renderer. Missing credentials or provider failure keep the existing
 memegen fallback available. Caption, URL, and image-byte duplicate checks share
@@ -458,9 +467,24 @@ containing secrets or commit `.env`; keep credentials in your Railway variables.
 
 ## Model Tuning And Checks
 
-GPT-OSS 120B remains the default. `OLLAMA_THINKING_LEVEL=low` uses its named
-[thinking control](https://docs.ollama.com/capabilities/thinking); blank uses the
-model default. Calls have a 45-second total deadline and three-request concurrency
+Gemma 4 31B is the default, served through the existing Ollama Cloud API and key.
+Use `OLLAMA_MODEL=gemma4:31b` with `OLLAMA_HOST=https://ollama.com`; no local
+model download or Railway GPU is needed. The cloud API uses the model name from
+its catalog, not the CLI's `:cloud` suffix. See [Ollama Cloud](https://docs.ollama.com/cloud).
+Free-plan access has usage limits; it is not unlimited inference.
+
+Gemma uses a boolean [thinking control](https://docs.ollama.com/capabilities/thinking).
+`OLLAMA_THINKING_LEVEL=false` keeps chat and internal JSON requests quick; `true`
+enables reasoning. Old GPT-OSS levels such as `low` are not sent to Gemma and
+leave thinking disabled. To switch back, set `OLLAMA_MODEL=gpt-oss:120b` and
+`OLLAMA_THINKING_LEVEL=low`. GPT-OSS still accepts `low`, `medium`, or `high`;
+blank or unsupported settings use that model's default.
+
+For Railway, set `OLLAMA_MODEL=gemma4:31b` and `OLLAMA_THINKING_LEVEL=false`
+in service Variables, then redeploy. Existing Railway variables override the
+project defaults; the ignored local `.env` is not uploaded with the code.
+
+Calls have a 45-second total deadline and three-request concurrency
 limit. Empty final answers get at most one larger-budget retry. Reasoning traces
 and accidental speaker envelopes are not sent to Discord. Ollama Cloud currently
 does not support [schema-enforced output](https://docs.ollama.com/capabilities/structured-outputs),

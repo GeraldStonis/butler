@@ -65,8 +65,13 @@ async def generate_response(
         async with asyncio.timeout(config.LLM_TIMEOUT_SECONDS):
             async with _requests:
                 kwargs = {}
-                if "gpt-oss" in config.OLLAMA_MODEL.lower() and config.OLLAMA_THINKING_LEVEL in {"low", "medium", "high"}:
-                    kwargs["think"] = config.OLLAMA_THINKING_LEVEL
+                model = config.OLLAMA_MODEL.lower()
+                thinking = config.OLLAMA_THINKING_LEVEL.lower()
+                if "gpt-oss" in model and thinking in {"low", "medium", "high"}:
+                    kwargs["think"] = thinking
+                elif "gemma4" in model:
+                    # Gemma uses a boolean, not GPT-OSS's named reasoning levels.
+                    kwargs["think"] = thinking in {"true", "1", "yes", "on"}
                 for attempt in range(2):
                     response = await client.chat(
                         model=config.OLLAMA_MODEL, messages=messages,

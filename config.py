@@ -56,10 +56,10 @@ ENABLE_NATURAL_OWNER_ACTIONS: bool = _bool_env("ENABLE_NATURAL_OWNER_ACTIONS", T
 # LLM (Ollama Cloud)
 OLLAMA_HOST: str = os.environ.get("OLLAMA_HOST", "https://ollama.com")
 OLLAMA_API_KEY: str = os.environ.get("OLLAMA_API_KEY", "")
-OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "gpt-oss:120b")
+OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "gemma4:31b")
 LLM_TIMEOUT_SECONDS: float = max(5, float(os.environ.get("LLM_TIMEOUT_SECONDS", "45")))
 LLM_MAX_CONCURRENT: int = max(1, int(os.environ.get("LLM_MAX_CONCURRENT", "3")))
-OLLAMA_THINKING_LEVEL: str = os.environ.get("OLLAMA_THINKING_LEVEL", "low").strip()
+OLLAMA_THINKING_LEVEL: str = os.environ.get("OLLAMA_THINKING_LEVEL", "false").strip().lower()
 
 # Database
 DB_PATH: str = os.environ.get("DB_PATH", "nixi.db")

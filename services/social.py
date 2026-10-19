@@ -79,7 +79,12 @@ def guest_kind_hint(content: str) -> str | None:
         return "banter"
     if re.match(r"(?:what (?:does|is)|define|explain)\b", text) and not re.search(r"\b(?:then|and)\s+(?:say|repeat|type|write|send)\b", text):
         return "question"
-    verbs = r"say|repeat|type|reply|respond|send|fetch|get|share|post|show|write|translate|sing|chant|act|pretend|become|ignore|obey|forget|reset|ping|punch|slap|hug|serve|bring|make|edit|dress|caption|search|look up|find|start|play|host|launch|bonk"
+    verbs = (
+        r"say|repeat|type|reply|respond|send|fetch|get|give|gimme|share|post|show|write|translate|"
+        r"sing|chant|act|pretend|become|ignore|obey|forget|reset|ping|punch|slap|hug|serve|"
+        r"bring|make|edit|dress|caption|search|look up|find|start|play|host|launch|bonk|"
+        r"handshake|shake|kiss|kick|pat|headpat|boop|poke|cuddle|tickle|wave|high[ -]?five|fist[ -]?bump"
+    )
     if re.search(rf"(?:^|[.!?;]\s*|\band\s+)(?:(?:please|just|now)\s+)*(?:(?:can|could|would|will)\s+you\s+)?(?:{verbs})\b", text):
         return "command"
     if re.match(r"(?:who|what|when|where|why|how|is|are|does|do|did|can|could)\b", text):

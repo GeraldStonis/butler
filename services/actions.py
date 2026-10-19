@@ -175,33 +175,37 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
 
         if name == "action_gif":
             target_id = owner_intent.target_user_id
-            notify_target = bool(target_id)
-            if not is_owner:
-                member = message.guild.get_member(target_id) if message.guild and target_id else None
-                mentioned_ids = {user.id for user in getattr(message, "mentions", [])}
-                if member is None or member.bot or member.id not in mentioned_ids:
-                    await message.reply("Mention a member of this server for a reaction GIF.", mention_author=False)
-                    return True
-                preferences = await db.get_member_preferences(message.guild.id, member.id)
-                if not preferences["media"] or not preferences["roasting"]:
-                    await message.reply("That member has opted out of targeted media or teasing.", mention_author=False)
-                    return True
-                notify_target = preferences["pings"]
+            member = message.guild.get_member(target_id) if message.guild and target_id else None
+            mentioned_ids = {user.id for user in getattr(message, "mentions", [])}
+            if member is None or member.bot or member.id not in mentioned_ids:
+                await message.reply("Mention a member of this server for a reaction GIF.", mention_author=False)
+                return True
+            if not owner_intent.action:
+                await message.reply("Tell me the action for that reaction GIF.", mention_author=False)
+                return True
+            preferences = await db.get_member_preferences(message.guild.id, member.id)
+            if not preferences["media"] or not is_owner and not preferences["roasting"]:
+                await message.reply("That member has opted out of targeted media or teasing.", mention_author=False)
+                return True
             result = await media.fetch_action_gif(owner_intent.action)
-            target = f"<@{owner_intent.target_user_id}>" if owner_intent.target_user_id else "the intended party"
             if not result:
                 await message.reply(
                     "I could not find a suitable reaction GIF. For now, consider this a stern eyebrow.",
                     mention_author=False,
                 )
                 return True
-            await message.channel.send(
-                (f"{target}, the Young Master has requested a little slapstick diplomacy."
-                 if is_owner else target),
+            # Recheck comfort settings after waiting on the GIF provider.
+            preferences = await db.get_member_preferences(message.guild.id, member.id)
+            if not preferences["media"] or not is_owner and not preferences["roasting"]:
+                await message.reply("That member has opted out of targeted media or teasing.", mention_author=False)
+                return True
+            sent = await message.channel.send(
+                f"<@{member.id}>",
                 embed=_media_embed(result),
                 allowed_mentions=discord.AllowedMentions(everyone=False, roles=False,
-                    users=[discord.Object(id=target_id)] if notify_target else [], replied_user=False),
+                    users=[discord.Object(id=member.id)] if preferences["pings"] else [], replied_user=False),
             )
+            await memory.log_delivery(sent)
             return True
 
     except Exception:
