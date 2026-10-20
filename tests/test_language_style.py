@@ -75,8 +75,9 @@ class VisibleResponseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reply, corrected)
         self.assertEqual(model.await_count, 2)
         repair = model.await_args.args[0]
-        self.assertEqual(repair[-2], {'role': 'assistant', 'content': draft})
-        self.assertIn('Keep the same meaning', repair[-1]['content'])
+        self.assertEqual(repair[-3], {'role': 'assistant', 'content': draft})
+        self.assertIn('Keep the same meaning', repair[-2]['content'])
+        self.assertEqual(repair[-1]['role'], 'user')
         self.assertEqual(model.await_args.kwargs['temperature'], 0.2)
         self.assertEqual(model.await_args.kwargs['max_tokens'], 180)
 

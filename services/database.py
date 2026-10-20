@@ -485,7 +485,7 @@ async def get_recent_messages(
     limit = limit or config.CONTEXT_WINDOW_SIZE
     db = await get_db()
     cursor = await db.execute(
-        """SELECT author_id, author_name, is_bot, content, created_at
+        """SELECT id, author_id, author_name, is_bot, content, created_at
            FROM messages
            WHERE channel_id = ?
            ORDER BY id DESC
@@ -495,6 +495,7 @@ async def get_recent_messages(
     rows = await cursor.fetchall()
     return [
         {
+            "id": row["id"],
             "author_id": row["author_id"],
             "author": row["author_name"],
             "is_bot": bool(row["is_bot"]),
@@ -520,7 +521,7 @@ async def get_oldest_messages(channel_id: int, limit: int) -> list[dict]:
     """Fetch the oldest N messages for a channel (for summarisation)."""
     db = await get_db()
     cursor = await db.execute(
-        """SELECT id, author_name, is_bot, content, created_at
+        """SELECT id, author_id, author_name, is_bot, content, created_at
            FROM messages
            WHERE channel_id = ?
            ORDER BY id ASC
@@ -568,7 +569,7 @@ async def get_latest_summary(channel_id: int) -> str | None:
     cursor = await db.execute(
         """SELECT summary FROM channel_summaries
            WHERE channel_id = ?
-           ORDER BY created_at DESC
+           ORDER BY created_at DESC, id DESC
            LIMIT 1""",
         (channel_id,),
     )

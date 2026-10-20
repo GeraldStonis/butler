@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import tempfile
+import time
 from pathlib import Path
 
 import config
@@ -18,6 +19,8 @@ async def probe() -> None:
         guest_id = config.OWNER_ID + 1
         try:
             for text in (
+                "hi nixi",
+                "thanks nixi",
                 "nixi I spent two hours choosing a Discord avatar",
                 "nixi I spent another hour choosing the same Discord avatar",
                 "nixi I had a bad day",
@@ -29,6 +32,7 @@ async def probe() -> None:
                 "nixi nah bro that ranked loss had me cooked fr",
                 "nixi \u092d\u093e\u0908 \u0915\u094d\u092f\u093e \u0939\u093e\u0932 \u0939\u0948?",
             ):
+                started = time.perf_counter()
                 await db.save_message(1, 1, guest_id, "Synthetic Guest", text)
                 kind = await social.classify_guest_message(text)
                 if kind == "protected":
@@ -38,6 +42,8 @@ async def probe() -> None:
                                                          guild_id=1, current_author_id=guest_id, nixi_author_id=99)
                     reply = await conversation.generate_reply(context, 1, text, nixi_author_id=99)
                 print(json.dumps({"input": text, "reply": reply,
+                                  "model": config.OLLAMA_MODEL,
+                                  "elapsed_seconds": round(time.perf_counter() - started, 2),
                                   "latin_script_reply": not has_non_latin_prose(reply)}, ensure_ascii=True), flush=True)
                 await db.save_message(1, 1, 99, "Nixi", reply, True)
         finally:

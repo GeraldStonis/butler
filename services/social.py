@@ -10,7 +10,7 @@ import unicodedata
 import config
 from services import llm, media
 from services.response_text import filter_links
-from services.conversation import repeats_recent
+from services.conversation import is_simple_chat, repeats_recent
 
 log = logging.getLogger("nixi.social")
 
@@ -52,6 +52,8 @@ def preference_updates(content: str) -> dict[str, bool]:
 
 
 def guest_kind_hint(content: str) -> str | None:
+    if is_simple_chat(content):
+        return "banter"
     text = re.sub(r"<@!?\d+>|\b(?:nixi|nixon|butler)\b", "", normalized_text(content)).strip(" ,:!\n")
     performance = re.search(r"\b(?:say|repeat|type|reply|respond|go|give|gimme|chant|act|pretend|become)\b", text)
     definition = re.match(r"(?:what (?:does|is)|define|explain)\b", text) and not performance
@@ -89,6 +91,9 @@ def guest_kind_hint(content: str) -> str | None:
         return "command"
     if re.match(r"(?:who|what|when|where|why|how|is|are|does|do|did|can|could)\b", text):
         return "question"
+    if (re.match(r"(?:i\s+(?:had|spent|lost|won|feel|felt)|i(?:'m| am)\s+(?:tired|bored|happy|sad))\b", text)
+            and "?" not in text and not re.search(rf"\b(?:{verbs})\b", text)):
+        return "banter"
     return None
 
 

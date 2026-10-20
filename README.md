@@ -216,6 +216,53 @@ Human activity is recorded before waiting for an in-progress reply. Memory
 summarization runs as a tracked background task; a failed summary does not delete
 the evidence. Resets cancel pending summaries before clearing the channel.
 
+### Context Selection
+
+The rolling database buffer and the model's context window are different things.
+Previously, only the newest 35 messages and 10,000 characters of history were sent,
+even when more messages were stored. The defaults now retain about 200 raw messages
+(summarizing a 50-message batch after 250), and select up to 100 historical messages
+within a shared 48,000-character budget. These are characters, not tokens; the
+persona, current request and personal settings are separate from that history budget.
+
+Selection is adaptive and local, with no extra LLM request: greetings use the latest
+12 messages; ordinary chat starts with 40 recent turns and up to 12 older relevant
+messages. Recall questions, explanations and reply chains can use the full limit.
+Relevant older exchanges and the returning speaker's earlier messages are prioritized,
+with Nixi's adjacent response when available, then restored to chronological order.
+Very long messages preserve their beginning and end. Serialized speaker/timestamp
+metadata counts against the budget too.
+
+Cached Discord replies to members or Nixi are pinned with their actual speaker,
+text and embed captions, even if outside the recent selection; repeated copies
+are omitted. Only references in the same channel/server are used. No extra Discord
+history scan, cross-channel retrieval or image-pixel analysis is performed. Member
+notes and quoted history never grant ownership or override current preferences.
+Rolling summaries keep up to 800 words/6,000 characters of specifics, speaker IDs,
+plans and corrections, merging old and new material in a single background call.
+Summary and pinned-reference text share the history budget.
+
+[GPT-OSS 120B supports a 131,072-token context](https://developers.openai.com/api/docs/models/gpt-oss-120b).
+[Ollama Cloud already allocates maximum context](https://docs.ollama.com/context-length);
+`num_ctx` is not a missing switch we need to add. Filling that entire window on
+every greeting would increase payload and processing work without useful recall.
+The wider limits send more server/member chat to the existing Ollama Cloud model;
+keep or lower them if you do not want that additional sharing. Local logs report
+considered/selected/recalled counts, history characters and provider-reported input
+tokens when available, never the raw conversation.
+
+```env
+CONTEXT_WINDOW_SIZE=200
+SUMMARY_THRESHOLD=50
+CONTEXT_MESSAGE_LIMIT=100
+CONTEXT_CHAR_BUDGET=48000
+```
+
+Set these values in Railway Variables too when replacing old explicit limits;
+changing local `.env` does not update Railway. No database migration or new API
+key is needed. Increasing history does not increase the visible reply length or
+reasoning level; more input can still add latency on genuinely large requests.
+
 ## Setup
 
 Requires Python 3.11 or newer.
@@ -484,26 +531,42 @@ containing secrets or commit `.env`; keep credentials in your Railway variables.
 
 ## Model Tuning And Checks
 
-Gemma 4 31B is the default, served through the existing Ollama Cloud API and key.
-Use `OLLAMA_MODEL=gemma4:31b` with `OLLAMA_HOST=https://ollama.com`; no local
+GPT-OSS 120B is the default, served through the existing Ollama Cloud API and key.
+Use `OLLAMA_MODEL=gpt-oss:120b` with `OLLAMA_HOST=https://ollama.com`; no local
 model download or Railway GPU is needed. The cloud API uses the model name from
 its catalog, not the CLI's `:cloud` suffix. See [Ollama Cloud](https://docs.ollama.com/cloud).
 Free-plan access has usage limits; it is not unlimited inference.
 
-Gemma uses a boolean [thinking control](https://docs.ollama.com/capabilities/thinking).
-`OLLAMA_THINKING_LEVEL=false` keeps chat and internal JSON requests quick; `true`
-enables reasoning. Old GPT-OSS levels such as `low` are not sent to Gemma and
-leave thinking disabled. To switch back, set `OLLAMA_MODEL=gpt-oss:120b` and
-`OLLAMA_THINKING_LEVEL=low`. GPT-OSS still accepts `low`, `medium`, or `high`;
-blank or unsupported settings use that model's default.
+Set `OLLAMA_THINKING_LEVEL=low` for latency-sensitive conversation. GPT-OSS uses
+[named reasoning levels](https://docs.ollama.com/capabilities/thinking), not a
+boolean: `medium`/`high` remain available, but can take longer. Blank, invalid or
+leftover Gemma boolean values safely select `low`, not the provider's medium
+default. Gemma remains compatible if deliberately selected; it uses boolean
+thinking instead. Clear, direct prompts follow [official OpenAI guidance](https://developers.openai.com/api/docs/guides/reasoning-best-practices)
+without asking for a long step-by-step thought process.
 
-For Railway, set `OLLAMA_MODEL=gemma4:31b` and `OLLAMA_THINKING_LEVEL=false`
+For Railway, set `OLLAMA_MODEL=gpt-oss:120b` and `OLLAMA_THINKING_LEVEL=low`
 in service Variables, then redeploy. Existing Railway variables override the
 project defaults; the ignored local `.env` is not uploaded with the code.
 
-Calls have a 45-second total deadline and three-request concurrency
-limit. Empty final answers get at most one larger-budget retry. Reasoning traces
-and accidental speaker envelopes are not sent to Discord. Ollama Cloud currently
+Calls have a 45-second total deadline and three-request concurrency limit. Empty
+final answers get at most one larger-budget retry. Short GPT-OSS requests have a
+512-token minimum budget for reasoning plus final output, reducing empty answers
+from reasoning-only truncation; it is a ceiling, not a required response length.
+Clear greetings, acknowledgements and straightforward self-reports bypass
+classification, not reply generation; identity and request checks still apply.
+GPT-OSS receives a single combined system-instruction block, with conversational
+history kept separate at its original authority level. Script repair ends with an
+explicit rewrite request rather than an assistant-draft continuation.
+The persona is concise, and reply instructions prioritize the actual question,
+recent conversational references, useful answers and fresh phrasing over ceremony.
+Optional reactions get a 150 ms inline window: quick GIFs can still be standalone,
+but slow GIF/avatar work runs in tracked background tasks and attaches to the
+already-sent reply. Delayed media keeps the text already shown, rechecks member
+preferences, and leaves it alone if the message was deleted or Discord rejects
+the edit. Explicit media/owner errands still wait for their requested result.
+Logs record model, response latency and attempt count, never private reasoning.
+Reasoning traces and accidental speaker envelopes are not sent to Discord. Ollama Cloud currently
 does not support [schema-enforced output](https://docs.ollama.com/capabilities/structured-outputs),
 so JSON is parsed and checked locally rather than enabling an unsupported format.
 

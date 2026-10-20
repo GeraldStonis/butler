@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 
 import config
-from services import llm, avatar_edits
+from services import llm, avatar_edits, conversation
 
 
 ACTION_PATTERNS = {
@@ -197,6 +197,8 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
 async def classify_owner_intent(text: str, mentions: list | None = None) -> OwnerIntent:
     """Classify a message into an action or chat, without granting authority."""
     mentions = mentions or []
+    if conversation.is_simple_chat(text):
+        return OwnerIntent("chat")
     heuristic = heuristic_intent(text, mentions)
     if heuristic:
         return heuristic

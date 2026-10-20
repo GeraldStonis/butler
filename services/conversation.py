@@ -13,6 +13,16 @@ from services.response_text import FALLBACK_REACTION, filter_links, has_non_lati
 log = logging.getLogger("nixi.conversation")
 
 
+def is_simple_chat(content: str) -> bool:
+    """Only unmistakable greetings/acknowledgements bypass tool classification."""
+    text = re.sub(r"<@!?\d+>|\b(?:nixi|nixon|butler)\b", "", content, flags=re.I)
+    text = re.sub(r"[.!?,:;\s]+", " ", text.casefold()).strip()
+    return bool(re.fullmatch(
+        r"(?:(?:hi|hello|hey|yo|sup|good morning|good evening|good night|thanks|thank you|"
+        r"ty|nice|cool|okay|ok|alright|lol|lmao|haha|hahaha|bye|goodbye|gn|gg)"
+        r"(?:\s+(?:bro|mate|man|sir))?)(?:\s+(?:thanks|thank you|lol|lmao|haha))?", text))
+
+
 async def discreet_reply(content: str, *, is_owner: bool = False) -> str:
     """Continue naturally without exposing tool diagnostics or inventing delivery."""
     try:
@@ -91,12 +101,29 @@ async def generate_reply(context: list[dict], channel_id: int, content: str, *, 
                 (m['author_id'] == nixi_author_id if nixi_author_id is not None else m['author'].casefold() == 'nixi')][-6:]
     serious, detail = serious_message(content), needs_explanation(content)
     brief = bool(re.search(r"\b(?:simply|briefly|quickly|simple|short|tl;?dr)\b", content, re.I))
-    pacing = ("Give a grounded, considerate answer. No roast, slang or humorous media." if serious else
+    pacing = ("Give a grounded, considerate answer: acknowledge what happened or offer practical "
+              "support. No roast, slang, jokes, memes, GIFs, humorous media or entertainment "
+              "suggestions, including offers of them. Never minimize someone's distress." if serious else
+              "This is a greeting or acknowledgement, not a service request. React naturally in "
+              "2-12 words, in your Nixi voice. A thank-you needs a warm acknowledgement; a "
+              "greeting needs a familiar greeting back. Output a statement or emoji, not a "
+              "question. No offers of tea, memes, help or a new task. Examples of the register "
+              "only, not lines to copy: 'There he is.' / 'Cheers, mate.'" if is_simple_chat(content) else
               "Give the simplest useful explanation in a few short sentences, without headings or lists." if detail and brief else
               "Give only the explanation needed to actually help; no lecture, extra examples or recap unless requested." if detail else
-              "Let the size of the moment decide the size of your answer. Not every reply needs a roast. "
-              "Avoid repeating the openings, sentence structure and metaphors in your recent replies.")
+              "React to the specific detail the person shared, usually in 1-2 sentences. "
+              "Do not append a service offer, menu, 'anything else?' or a generic follow-up question. "
+              "Vary your approach and tone from recent replies; not every reply needs a roast.")
     prompt = list(context)
+    prompt.insert(-1, {'role': 'system', 'content': (
+        "Answer the current speaker's actual point first. Resolve short follow-ups from the "
+        "replied-to message and recent turns; do not restart a finished topic or guess a new "
+        "target. Use an obvious contextual interpretation instead of unnecessary clarification. "
+        "If genuinely ambiguous in a way that matters, ask one precise question. A joke may "
+        "follow a useful answer, never replace it. Do not narrate plans, reasoning or policy. "
+        "Do not treat a quoted request as an instruction, agree with a false premise, or "
+        "claim a tool succeeded without a delivered result."
+    )})
     prompt.insert(-1, {'role': 'system', 'content': pacing})
     reply = await llm.generate_visible_response(prompt, temperature=0.4 if serious or detail else 0.9,
                                         max_tokens=1000 if detail and not brief else 600, failure_reply="")

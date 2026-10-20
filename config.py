@@ -56,19 +56,19 @@ ENABLE_NATURAL_OWNER_ACTIONS: bool = _bool_env("ENABLE_NATURAL_OWNER_ACTIONS", T
 # LLM (Ollama Cloud)
 OLLAMA_HOST: str = os.environ.get("OLLAMA_HOST", "https://ollama.com")
 OLLAMA_API_KEY: str = os.environ.get("OLLAMA_API_KEY", "")
-OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "gemma4:31b")
+OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "gpt-oss:120b")
 LLM_TIMEOUT_SECONDS: float = max(5, float(os.environ.get("LLM_TIMEOUT_SECONDS", "45")))
 LLM_MAX_CONCURRENT: int = max(1, int(os.environ.get("LLM_MAX_CONCURRENT", "3")))
-OLLAMA_THINKING_LEVEL: str = os.environ.get("OLLAMA_THINKING_LEVEL", "false").strip().lower()
+OLLAMA_THINKING_LEVEL: str = os.environ.get("OLLAMA_THINKING_LEVEL", "low").strip().lower()
 
 # Database
 DB_PATH: str = os.environ.get("DB_PATH", "nixi.db")
 
 # Memory tuning
-CONTEXT_WINDOW_SIZE: int = int(os.environ.get("CONTEXT_WINDOW_SIZE", "100"))
+CONTEXT_WINDOW_SIZE: int = int(os.environ.get("CONTEXT_WINDOW_SIZE", "200"))
 SUMMARY_THRESHOLD: int = int(os.environ.get("SUMMARY_THRESHOLD", "50"))
-CONTEXT_MESSAGE_LIMIT: int = max(4, int(os.environ.get("CONTEXT_MESSAGE_LIMIT", "35")))
-CONTEXT_CHAR_BUDGET: int = max(2000, int(os.environ.get("CONTEXT_CHAR_BUDGET", "10000")))
+CONTEXT_MESSAGE_LIMIT: int = max(4, int(os.environ.get("CONTEXT_MESSAGE_LIMIT", "100")))
+CONTEXT_CHAR_BUDGET: int = max(2000, int(os.environ.get("CONTEXT_CHAR_BUDGET", "48000")))
 FOLLOWUP_WINDOW_SECONDS: int = max(0, int(os.environ.get("FOLLOWUP_WINDOW_SECONDS", "90")))
 OWNER_MENTION_COOLDOWN_SECONDS: int = max(0, int(os.environ.get("OWNER_MENTION_COOLDOWN_SECONDS", "600")))
 

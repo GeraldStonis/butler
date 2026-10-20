@@ -11,6 +11,7 @@ import logging
 import re
 import asyncio
 import json
+import time
 from ollama import AsyncClient
 
 import config
@@ -61,22 +62,33 @@ async def generate_response(
         keeps replies punchy and in-character.
     """
     client = _get_client()
+    started = time.monotonic()
     try:
         async with asyncio.timeout(config.LLM_TIMEOUT_SECONDS):
             async with _requests:
                 kwargs = {}
                 model = config.OLLAMA_MODEL.lower()
                 thinking = config.OLLAMA_THINKING_LEVEL.lower()
-                if "gpt-oss" in model and thinking in {"low", "medium", "high"}:
-                    kwargs["think"] = thinking
+                is_gpt_oss = "gpt-oss" in model
+                request_messages = messages
+                if is_gpt_oss:
+                    # An old Gemma boolean must not silently enable medium reasoning.
+                    kwargs["think"] = thinking if thinking in {"low", "medium", "high"} else "low"
+                    # Supply one instruction block for Harmony-based serving templates.
+                    instructions = [m["content"] for m in messages if m["role"] == "system"]
+                    if len(instructions) > 1:
+                        request_messages = [{"role": "system", "content": "\n\n".join(instructions)}]
+                        request_messages.extend(dict(m) for m in messages if m["role"] != "system")
                 elif "gemma4" in model:
                     # Gemma uses a boolean, not GPT-OSS's named reasoning levels.
                     kwargs["think"] = thinking in {"true", "1", "yes", "on"}
+                # GPT-OSS shares this budget between reasoning and the final answer.
+                budget = max(max_tokens, 512) if is_gpt_oss else max_tokens
                 for attempt in range(2):
                     response = await client.chat(
-                        model=config.OLLAMA_MODEL, messages=messages,
+                        model=config.OLLAMA_MODEL, messages=request_messages,
                         options={"temperature": temperature,
-                                 "num_predict": max(max_tokens, 1200) if attempt else max_tokens},
+                                 "num_predict": max(budget, 1200) if attempt else budget},
                         **kwargs,
                     )
                     content = response.message.content or ""
@@ -92,6 +104,10 @@ async def generate_response(
                                     content = envelope["text"].strip()
                             except (ValueError, AttributeError):
                                 pass
+                        log.info("LLM response model=%s elapsed=%.2fs attempts=%d input_tokens=%s output_tokens=%s prompt_chars=%d",
+                                 config.OLLAMA_MODEL, time.monotonic() - started, attempt + 1,
+                                 getattr(response, "prompt_eval_count", None), getattr(response, "eval_count", None),
+                                 sum(len(m["content"]) for m in request_messages))
                         return re.sub(r"^(?:\[)?Nixi(?:\])?:\s*", "", content, flags=re.I)
         return failure_reply if failure_reply is not None else FALLBACK_REACTION
     except Exception as exc:
@@ -124,7 +140,8 @@ async def generate_visible_response(
                   "Roman-script Hinglish, or Roman-script Bhojpuri only. Preserve emojis, code, "
                   "URLs and Discord tokens exactly. Do not add claims, perform any new request, "
                   "quote the old script, or explain the rewrite. Output only the corrected reply."
-              )}]
+              )},
+              {"role": "user", "content": "Return only the corrected draft, without commentary."}]
     fixed = await generate_response(repair, temperature=0.2, max_tokens=max_tokens, failure_reply="")
     if fixed and not has_non_latin_prose(fixed):
         return fixed
