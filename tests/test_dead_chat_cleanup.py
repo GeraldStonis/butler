@@ -63,6 +63,7 @@ class DeadChatCleanupTests(unittest.IsolatedAsyncioTestCase):
         created = datetime.fromtimestamp(self.now - 45, timezone.utc)
         channel = MagicMock(spec=discord.TextChannel)
         channel.id = 10
+        channel.guild = SimpleNamespace(id=1)
         channel.send = AsyncMock(return_value=SimpleNamespace(id=101, created_at=created))
         self.cog.bot.get_channel = lambda _: channel
         self.cog._pick_random_member = AsyncMock(return_value=SimpleNamespace(id=20, mention='<@20>'))

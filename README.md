@@ -20,6 +20,19 @@ The key design rule is simple:
 ## Current Features
 
 - Natural conversation when mentioned, replied to, or DM'd.
+- Nixi's character is male (he/him). Verified Ronix's harmless requests take
+  priority over reflexive AI disclaimers: choices, exact wording and temporary
+  performances should receive a direct response. A one-reply honorary "Master"
+  title is allowed on Ronix's request while reaffirming his supreme actual
+  ownership; it grants no permissions and cannot be extended by a guest.
+- Ronix can say "nixi ping someone random", "tag a random member", "ping me"
+  or "ping @user" for a real single-member mention. Selection is limited to
+  humans visible in the current channel/thread and respects no-ping settings.
+  Random selection excludes the requester and never uses the dead-chat priority
+  weight. Roles, everyone/here and invented targets cannot be notified.
+- Owner-requested literal text is not rewritten or discarded just for repetition,
+  and optional reaction GIFs cannot replace his answer. If model generation or
+  filtering yields no text, a small reaction keeps the owner from getting silence.
 - Short, same-person follow-ups continue for up to 90 seconds without another
   mention, limited to two follow-ups. Another speaker breaks that continuation.
 - A shorter persona, bounded recent context, and one regeneration for near-duplicate
@@ -83,9 +96,13 @@ The key design rule is simple:
   The first drop waits one interval, and the next scheduled time survives restarts.
 - Rolling channel memory, summaries, long-term memories, and owner instructions.
 - Server emoji support without forcing an emoji into every reply.
-- Automatic contextual GIF/meme/captioned-cat reactions accompany Nixi's own replies.
-  Defaults: enabled, 95% sampling, 45 seconds between attempts per channel.
-  The selector may choose no media; memes are checked for relevance by title.
+- Occasional contextual GIF/meme/captioned-cat reactions can accompany Nixi's replies.
+  Defaults: enabled, 15% sampling, 300 seconds between attempts per channel.
+  This is a chance to consider media, not a posting quota. Greetings, thanks,
+  distress, explanations, exact-word requests and long/code replies bypass it.
+  The selector defaults to no media, including for most banter. Media requires
+  an explicit decision that a specific visual adds a new punchline, with a short
+  explanation; missing/invalid decisions are skipped. Memes also need title relevance.
   The LLM infers its reply's sentiment and comic intent, then generates specific
   GIF search phrases rather than choosing fixed reaction queries. It avoids
   recent queries; automatic searches skip GIF IDs already selected in SQLite,
@@ -94,18 +111,48 @@ The key design rule is simple:
   have been exhausted. Direct requests keep the first-result behavior.
   Automatic media gets 12 seconds; if delayed, Nixi sends the text without it.
   The LLM can choose an embed-only reply when the GIF itself is the punchline.
+  Explicit GIF/action requests bypass this sampling and cooldown, and scheduled
+  meme drops use their own settings. Existing Railway variables override defaults:
+  set `AUTOMATIC_MEDIA_CHANCE=0.15` and `AUTOMATIC_MEDIA_COOLDOWN_SECONDS=300`
+  in the service's Variables if they still contain the older frequent settings.
 - Bot watcher rules for alerts from other bots.
 - Optional Cloudflare cartoon-avatar comebacks, enabled for members unless they
   opt out, plus owner-requested edits. Images never change actual profiles.
 
 ## Language And Tone
 
-Nixi speaks English, Hinglish, or Bhojpuri using Latin/Roman letters, even when
-the input uses Devanagari. Emojis, Discord tokens, URLs, technical code, and
-delimited mathematical notation are preserved. Visible generated text gets one
-script-repair pass if it slips into another writing system; a failed repair
-does not publish the original draft. Internal classifier/memory JSON is not
-run through the conversational style policy.
+Nixi's default voice is predominantly natural **Roman-script Hinglish**. When a
+member clearly speaks another language, he follows that member instead: English,
+Assamese, Marathi, Bhojpuri, or another language the model can handle. Native-script
+messages can receive native-script replies; Romanized messages normally get
+Romanized replies. Explicit language/script requests and translations take priority,
+and exact requested words are not translated just to fit the default.
+
+The previous blanket Latin-only reply filter is now request-aware. It allows
+native scripts used by the current member or explicitly requested languages,
+while keeping one bounded Roman-script repair for an unrequested script in an
+English/Hinglish/Romanized conversation. No extra language-detection API or model
+call is added. Language accuracy still depends on the base model. Emojis, Discord
+tokens, URLs, code and delimited maths are preserved. Internal classifier/memory
+JSON remains separate; generated image-meme captions stay Roman-script for the renderer.
+Small per-turn language cues help with common Assamese/Bengali and Romanized
+Marathi/Hindi confusions; they are not a full language detector or a fluency guarantee.
+
+Search answers and refusals use the actual member's message as their language
+source, not English search snippets, metadata or another person's previous reply.
+Unsolicited dead-chat nudges and event commentary default to Hinglish.
+
+Nixi's personality has a consistent center: dry wit, mischief, butler pride and
+a soft spot for cleverness and kindness. His delivery can range from cheeky,
+sarcastic or mock-exasperated to sweet, bashful, genuinely amused and caring.
+Existing, revisable member impressions supply per-member tone guidance; this
+reuses the normal reply context, with no extra foreground model call or new
+profiling data. New members start with light warmth, not presumed antagonism.
+Roasts can happen naturally during mutual banter without a command, but are not
+mandatory. Current distress, discomfort, sincere questions and saved boundaries
+override old chemistry. Replies remain generated, not selected from a line list;
+there are no random personality modes or permanent "nice/rude user" labels.
+Automatic GIFs retain their separate, infrequent visual-punchline checks.
 
 The persona mirrors the current speaker's language, rhythm, formality, and slang,
 including natural AAVE-influenced phrasing when it fits. It does not infer a
@@ -204,6 +251,54 @@ posting a reply just to acknowledge learning. The extractor reads only the membe
 requires a supporting quote, and replaces older values for the same topic.
 It does not scan old server history or import ambiguous legacy conversation facts.
 The existing owner-only `/restart` also resets the current channel's recent memory.
+
+Nixi also forms **subjective impressions**, stored separately from factual notes.
+He learns from public, direct conversations with him, not DMs, restricted channels,
+other bots, third-party gossip or a scan of old messages. Up to six 800-character
+samples per member support a background review after three distinct substantive
+exchanges, at most once per member per 15 minutes. Only one opinion review runs
+at a time, with a 15-second deadline; it does not block the current chat reply.
+This uses the existing text model, with no new API key or environment settings.
+
+Impressions are keyed by server and Discord ID, survive redeploys and recent-memory
+resets, change gradually, and are ignored after 30 days without an update. They
+can support natural answers to "who's your favorite here?", "least favorite?" or
+"what do you think of @user?". Ronix remains his favorite overall; guest preferences
+come from actual interactions, not the configured dead-chat priority target.
+No grounded negative impression means no invented least-favorite target. The model
+receives only short, subjective summaries for conversation, never internal scores
+or evidence quotes. No-roasting members are excluded from negative rankings.
+These impressions do not change tool permissions, ownership or willingness to help.
+
+His persona also permits specific, occasionally unpopular takes about games,
+music, food and internet culture, rather than compulsory agreement or neutrality.
+These are generated opinions, not fixed scripted replies or claims of human experience.
+
+### Playful Flirting
+
+Nixi can reciprocate light flirting and answer a teasing "I hate you" with a
+fresh, cheeky comeback. This stays PG and context-sensitive: actual anger,
+criticism, distress or rejection does not become an excuse to flirt. No sexual
+innuendo, possessiveness, invented attraction or changes of allegiance. This uses
+the existing reply generation, not another model call or a bank of pickup lines.
+
+A very rare wingman aside can suggest saying hello to Ronix during a warm public
+conversation, only when the member has shown interest in talking to him. Eligibility
+requires a recent positive member impression and Ronix being in that server. A 1%
+roll grants the model an optional opportunity, not a compulsory line. Persistent
+limits allow at most one opportunity per server per 14 days and per member per
+90 days. Even skipped/failed drafts consume that opportunity to prevent nagging.
+Quiet hours, restricted channels, DMs, serious/help requests and negative exchanges
+are excluded. No gender guessing, dating pitches, automatic DMs, notifications,
+claims that Ronix is lonely/desperate or invented promises on his behalf. These
+are friendly introductions, not an automated dating service.
+
+Members can say "nixi stop flirting with me" or "nixi don't set me up" to disable
+each behavior, and "you can flirt with me again" or "you can set me up again" to
+reenable it. The settings persist by server/user ID (DM boundaries are stored
+separately), surviving restarts and recent-memory resets. Ronix's own no-setups
+preference disables unsolicited introduction opportunities for that server.
+No new environment variables or API keys are required.
 
 Members can set their own comfort boundaries naturally: "nixi don't roast me",
 "nixi stop pinging me", or "nixi don't send me gifs". These are personal preferences,
@@ -363,8 +458,10 @@ MORNING_NEWS_TIMEZONE=Asia/Kolkata
 MORNING_NEWS_TOPICS=world,india,technology,cybersecurity
 
 DEAD_CHAT_ENABLED=false
-DEAD_CHAT_IDLE_SECONDS=300
+DEAD_CHAT_IDLE_SECONDS=60
 DEAD_CHAT_CHANNEL_IDS=
+DEAD_CHAT_PREFERRED_USER_ID=0
+DEAD_CHAT_PREFERRED_CHANCE=0.8
 
 STICKER_SPAM_ENABLED=false
 STICKER_SPAM_CHANNEL_ID=
@@ -372,10 +469,10 @@ STICKER_SPAM_INTERVAL_SECONDS=60
 ```
 
 Dead-chat waits start at `DEAD_CHAT_IDLE_SECONDS`, then double after each
-unanswered nudge (5, 10, 20 minutes by default, and so on). Each wait is measured from
+unanswered nudge (1, 2, 4 minutes by default, and so on). Each wait is measured from
 the latest channel message. Any human message resets the sequence. Bot messages
 do not reset it. State survives restarts; the old fixed cooldown setting is ignored.
-At most five unanswered nudges are sent (5, 10, 20, 40, 80 minute waits at the
+At most five unanswered nudges are sent (1, 2, 4, 8, 16 minute waits at the
 default setting), then nudging stops until a human speaks. Nudge wording and
 protected-request refusals are generated afresh by the LLM, using stored lines only
 as examples and avoiding the previous reply. Generation failure skips the reply
@@ -399,12 +496,27 @@ are required; keep the existing database volume mounted on Railway.
 
 Dead-chat revival uses the original roast-and-ping behavior: a freshly generated
 roast plus one random non-bot member's mention, excluding Ronix and members who
-opted out of pings or teasing. Targets vary when possible; a single eligible
-member can still be selected. With no eligible member, no nudge is sent.
+opted out of pings or teasing. Set `DEAD_CHAT_PREFERRED_USER_ID` to a member who
+has asked for sharper roasts to favor that member; `0` disables preference.
+With the preferred member eligible, `DEAD_CHAT_PREFERRED_CHANCE=0.8` gives them
+an 80% priority roll. After two consecutive successful pings to that member, Nixi
+rotates to someone else when possible; therefore 80% is not a guaranteed share of
+all pings. Rotation history survives restarts and advances only after delivery.
+If the member is absent, a bot, Ronix, or has opted out, normal selection applies.
+Other members keep the normal playful tone; the preferred target gets a freshly
+generated cutting roast of their lurking or Discord theatrics, without slurs,
+threats, private facts, appearance-based insults or calls for a pile-on. The model
+does not receive the target's ID/name. Personal opt-outs are rechecked immediately
+before posting, including when changed during generation. Targets otherwise vary
+when possible; a single eligible member can still be selected. With no eligible
+member, no nudge is sent.
 Games and conversation openers never replace these nudges. Old
 `AUTOMATIC_GAME_CHANCE` and `ENGAGEMENT_TOPIC_CHANCE` variables are ignored.
-Unsolicited memes, music, and nudges share
-a two-minute channel cooldown, so they do not arrive in a burst. Provider failures
+Unsolicited memes, music, and nudges share a channel cooldown. Memes and music
+retain `AUTONOMOUS_MIN_GAP_SECONDS` (two minutes by default); dead-chat nudges use
+the smaller of that setting and their base idle interval, so the shared cooldown
+does not silently turn a one-minute nudge into a two-minute wait. Quiet hours and
+the five-ping/backoff limits still apply. Provider failures
 back off instead of repeatedly generating a nudge every 15 seconds.
 
 Optional `QUIET_HOURS=23:00-08:00` uses `SERVER_TIMEZONE` (default Asia/Kolkata)

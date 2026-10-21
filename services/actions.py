@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import random
 
 import discord
 
@@ -33,11 +34,12 @@ async def reply_discreetly(message: discord.Message, kind: str, reason: str) -> 
     await memory.log_delivery(sent)
 
 
-async def build_news_briefing(topic: str | None = None, *, include_links: bool = False) -> str:
+async def build_news_briefing(topic: str | None = None, *, include_links: bool = False, language_request: str = "") -> str:
     """Fetch and summarize a compact news briefing."""
     query = topic or ", ".join(config.MORNING_NEWS_TOPICS)
     results = await search.news_search(query, count=8)
-    return await search.summarize_results(query, results, mode="news", include_links=include_links)
+    return await search.summarize_results(query, results, mode="news", include_links=include_links,
+                                          language_request=language_request)
 
 
 async def execute_owner_intent(
@@ -57,6 +59,43 @@ async def execute_guest_intent(message: discord.Message, guest_intent: intent.Ow
     return await _execute_intent(message, guest_intent)
 
 
+async def _send_member_ping(message: discord.Message) -> None:
+    if message.author.id != config.OWNER_ID:
+        return
+    # Reparse the real text: a classifier's suggested action/ID is not authorization.
+    request = intent.ping_request(message.content, list(getattr(message, "mentions", [])))
+    if request is None or message.guild is None:
+        await reply_discreetly(message, "member_ping", "no_valid_server_request")
+        return
+    opted_out = await db.get_ping_opt_outs(message.guild.id)
+    candidates = []
+    for visible in getattr(message.channel, "members", []):
+        member = message.guild.get_member(visible.id)
+        if member is None or member.bot or member.id in opted_out:
+            continue
+        if request.action == "random" and member.id == message.author.id:
+            continue
+        if request.action == "self" and member.id != message.author.id:
+            continue
+        if request.action == "target" and member.id != request.target_user_id:
+            continue
+        candidates.append(member)
+    while candidates:
+        member = random.choice(candidates) if request.action == "random" else candidates[0]
+        preferences = await db.get_member_preferences(message.guild.id, member.id)
+        if not preferences["pings"]:
+            candidates.remove(member)
+            continue
+        sent = await message.channel.send(
+            f"<@{member.id}>",
+            allowed_mentions=discord.AllowedMentions(everyone=False, roles=False,
+                users=[discord.Object(id=member.id)], replied_user=False),
+        )
+        await memory.log_delivery(sent)
+        return
+    await reply_discreetly(message, "member_ping", "no_eligible_member")
+
+
 async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIntent) -> bool:
     name = owner_intent.name
     is_owner = message.author.id == config.OWNER_ID
@@ -66,6 +105,10 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
         return False
 
     try:
+        if name == "member_ping":
+            await _send_member_ping(message)
+            return True
+
         if name == "song":
             song = await music.select_song(message.channel.id, owner_intent.query)
             if not song:
@@ -124,7 +167,8 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
         if name == "web_search":
             query = owner_intent.query or message.content
             results = await search.web_search(query, count=6)
-            text = await search.summarize_results(query, results, include_links=requests_links(message.content))
+            text = await search.summarize_results(query, results, include_links=requests_links(message.content),
+                                                  language_request=message.content)
             if text:
                 await message.reply(text, mention_author=False)
             else:
@@ -132,7 +176,8 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             return True
 
         if name == "news":
-            text = await build_news_briefing(owner_intent.query or None, include_links=requests_links(message.content))
+            text = await build_news_briefing(owner_intent.query or None, include_links=requests_links(message.content),
+                                             language_request=message.content)
             if text:
                 await message.reply(text, mention_author=False)
             else:

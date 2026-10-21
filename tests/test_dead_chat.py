@@ -76,6 +76,7 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         connection = await db.get_db()
         channel = MagicMock(spec=discord.TextChannel)
         channel.id = 10
+        channel.guild = SimpleNamespace(id=1)
         channel.send = AsyncMock(side_effect=[
             SimpleNamespace(id=101, created_at=datetime.now(timezone.utc)),
             SimpleNamespace(id=102, created_at=datetime.now(timezone.utc)),
@@ -131,6 +132,7 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         await connection.commit()
         channel = MagicMock(spec=discord.TextChannel)
         channel.id = 10
+        channel.guild = SimpleNamespace(id=1)
         channel.send = AsyncMock(return_value=SimpleNamespace(id=103, created_at=datetime.now(timezone.utc)))
         games = SimpleNamespace(active={}, start_game=AsyncMock(return_value=True))
         cog = object.__new__(HousekeepingCog)

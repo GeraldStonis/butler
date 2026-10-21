@@ -239,7 +239,8 @@ class ImgflipTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Captioned GIF delivered', logged.await_args.kwargs['content'])
 
     async def test_automatic_gif_captioning_requires_explicit_enablement(self):
-        decision = json.dumps({'kind': 'captioned_gif', 'sentiment': 'mock disbelief', 'delivery': 'media_only'})
+        decision = json.dumps({'kind': 'captioned_gif', 'sentiment': 'mock disbelief', 'delivery': 'media_only',
+                               'adds_punchline': True, 'visual_punchline': 'The evidence vanishes as the boast gets bigger.'})
         result = media.MediaResult('A fresh caption', 'https://i.imgflip.com/example.gif')
         with patch.object(generated_memes.llm, 'generate_response', AsyncMock(return_value=decision)), patch.object(media, 'fetch_captioned_gif', AsyncMock(return_value=result)) as fetch:
             self.assertIsNone(await social.AutomaticMedia().choose(10, 'a joke', 'a comeback'))

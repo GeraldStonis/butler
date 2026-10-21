@@ -43,7 +43,7 @@ def spam_quiet_now(channel_id: int, now: datetime | None = None) -> bool:
                 and quiet_now(now, hours=config.SPAM_QUIET_HOURS))
 
 
-async def can_post(channel_id: int) -> bool:
+async def can_post(channel_id: int, *, min_gap_seconds: int | None = None) -> bool:
     if quiet_now() or spam_quiet_now(channel_id):
         return False
     stored = await db.get_state(f"autonomous_last:{channel_id}")
@@ -51,7 +51,8 @@ async def can_post(channel_id: int) -> bool:
         last = float(stored or 0)
     except ValueError:
         last = 0
-    return time.time() - last >= config.AUTONOMOUS_MIN_GAP_SECONDS
+    gap = config.AUTONOMOUS_MIN_GAP_SECONDS if min_gap_seconds is None else max(0, min_gap_seconds)
+    return time.time() - last >= gap
 
 
 async def mark_sent(channel_id: int) -> None:

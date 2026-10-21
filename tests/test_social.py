@@ -61,7 +61,7 @@ class SocialTests(unittest.IsolatedAsyncioTestCase):
     async def test_independent_gif_and_channel_cooldown(self):
         service = social.AutomaticMedia()
         result = media.MediaResult('laugh', 'https://example.com/laugh.gif')
-        with patch('config.AUTOMATIC_MEDIA_ENABLED', True), patch('config.AUTOMATIC_MEDIA_CHANCE', 1.0), patch('config.AUTOMATIC_MEDIA_COOLDOWN_SECONDS', 180), patch('services.social.random.random', return_value=0), patch.object(social.llm, 'generate_response', AsyncMock(return_value='{"kind":"gif","sentiment":"absurd amusement","gif_queries":["cartoon detective wheezing"]}')), patch.object(media, 'fetch_gif', AsyncMock(return_value=result)) as fetch:
+        with patch('config.AUTOMATIC_MEDIA_ENABLED', True), patch('config.AUTOMATIC_MEDIA_CHANCE', 1.0), patch('config.AUTOMATIC_MEDIA_COOLDOWN_SECONDS', 180), patch('services.social.random.random', return_value=0), patch.object(social.llm, 'generate_response', AsyncMock(return_value='{"kind":"gif","sentiment":"absurd amusement","adds_punchline":true,"visual_punchline":"The detective physically collapses trying to follow the absurd alibi.","gif_queries":["cartoon detective wheezing"]}')), patch.object(media, 'fetch_gif', AsyncMock(return_value=result)) as fetch:
             self.assertIs(await service.choose(10, 'my joke', 'Nice one.'), result)
             fetch.assert_awaited_once_with('cartoon detective wheezing', avoid_repeats=True)
             self.assertIsNone(await service.choose(10, 'another joke', 'Ha.'))
@@ -69,7 +69,7 @@ class SocialTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_meme_must_fit_exchange(self):
         for verdict, expected in [('no', False), ('yes', True)]:
-            with self.subTest(verdict=verdict), patch('config.AUTOMATIC_MEDIA_ENABLED', True), patch('config.AUTOMATIC_MEDIA_CHANCE', 1.0), patch('services.social.random.random', return_value=0), patch.object(social.llm, 'generate_response', AsyncMock(side_effect=['{"kind":"meme"}', verdict])), patch.object(media, 'fetch_meme', AsyncMock(return_value=media.MediaResult('Test meme', 'https://example.com/meme.jpg'))):
+            with self.subTest(verdict=verdict), patch('config.AUTOMATIC_MEDIA_ENABLED', True), patch('config.AUTOMATIC_MEDIA_CHANCE', 1.0), patch('services.social.random.random', return_value=0), patch.object(social.llm, 'generate_response', AsyncMock(side_effect=['{"kind":"meme","adds_punchline":true,"visual_punchline":"The two panels reveal the exact opposite outcome to the boast."}', verdict])), patch.object(media, 'fetch_meme', AsyncMock(return_value=media.MediaResult('Test meme', 'https://example.com/meme.jpg'))):
                 self.assertEqual(bool(await social.AutomaticMedia().choose(10, 'joke', 'Ha.')), expected)
 
     async def test_no_media_choice_does_not_fetch(self):
@@ -79,7 +79,7 @@ class SocialTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_roast_gif_can_be_selected_as_the_entire_reply(self):
         result = media.MediaResult('Side eye', 'https://example.com/roast.gif')
-        with patch('config.AUTOMATIC_MEDIA_ENABLED', True), patch('config.AUTOMATIC_MEDIA_CHANCE', 1.0), patch('services.social.random.random', return_value=0), patch.object(social.llm, 'generate_response', AsyncMock(return_value='{"kind":"gif","sentiment":"mock disbelief","gif_queries":["judge judy skeptical stare"],"delivery":"media_only"}')), patch.object(media, 'fetch_gif', AsyncMock(return_value=result)) as fetch:
+        with patch('config.AUTOMATIC_MEDIA_ENABLED', True), patch('config.AUTOMATIC_MEDIA_CHANCE', 1.0), patch('services.social.random.random', return_value=0), patch.object(social.llm, 'generate_response', AsyncMock(return_value='{"kind":"gif","sentiment":"mock disbelief","adds_punchline":true,"visual_punchline":"The judge waits in silence for evidence of the grand claim.","gif_queries":["judge judy skeptical stare"],"delivery":"media_only"}')), patch.object(media, 'fetch_gif', AsyncMock(return_value=result)) as fetch:
             reaction = await social.AutomaticMedia().choose(10, 'I am the greatest yapper alive', 'The silence disagrees.')
             self.assertTrue(reaction.standalone)
             fetch.assert_awaited_once_with('judge judy skeptical stare', avoid_repeats=True)

@@ -147,6 +147,8 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             media INTEGER NOT NULL DEFAULT 1,
             pings INTEGER NOT NULL DEFAULT 1,
             avatar_edits INTEGER NOT NULL DEFAULT 1,
+            flirting INTEGER NOT NULL DEFAULT 1,
+            introductions INTEGER NOT NULL DEFAULT 1,
             PRIMARY KEY (guild_id, user_id)
         );
         CREATE TABLE IF NOT EXISTS reaction_gif_history (
@@ -178,6 +180,27 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (guild_id, user_id, fact_key)
         );
+        CREATE TABLE IF NOT EXISTS member_impressions (
+            guild_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            impression TEXT NOT NULL DEFAULT '',
+            affinity INTEGER NOT NULL DEFAULT 0 CHECK (affinity BETWEEN -2 AND 2),
+            evidence TEXT NOT NULL DEFAULT '',
+            interaction_count INTEGER NOT NULL DEFAULT 0,
+            reviewed_count INTEGER NOT NULL DEFAULT 0,
+            next_review_at REAL NOT NULL DEFAULT 0,
+            updated_at REAL NOT NULL DEFAULT 0,
+            PRIMARY KEY (guild_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS member_impression_samples (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            created_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_member_impression_samples
+            ON member_impression_samples (guild_id, user_id, id);
     """)
     cursor = await db.execute("PRAGMA table_info(channel_activity)")
     columns = {row["name"] for row in await cursor.fetchall()}
@@ -189,8 +212,10 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
         if name not in columns:
             await db.execute(f"ALTER TABLE channel_activity ADD COLUMN {name} {definition}")
     cursor = await db.execute("PRAGMA table_info(member_preferences)")
-    if "avatar_edits" not in {row["name"] for row in await cursor.fetchall()}:
-        await db.execute("ALTER TABLE member_preferences ADD COLUMN avatar_edits INTEGER NOT NULL DEFAULT 1")
+    preference_columns = {row["name"] for row in await cursor.fetchall()}
+    for name in ("avatar_edits", "flirting", "introductions"):
+        if name not in preference_columns:
+            await db.execute(f"ALTER TABLE member_preferences ADD COLUMN {name} INTEGER NOT NULL DEFAULT 1")
     await db.commit()
 
 
@@ -433,6 +458,18 @@ async def claim_activity(item_key: str) -> bool:
     return cursor.rowcount == 1
 
 
+async def claim_cooldown(key: str, now: float, seconds: float) -> bool:
+    """Atomically reserve a persistent opportunity, even across concurrent channels."""
+    connection = await get_db()
+    cursor = await connection.execute(
+        """INSERT INTO bot_state (key, value) VALUES (?, ?)
+           ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP
+           WHERE CAST(bot_state.value AS REAL)<=?""", (key, str(now + seconds), now),
+    )
+    await connection.commit()
+    return cursor.rowcount == 1
+
+
 async def add_activity_score(guild_id: int, user_id: int, game: str, points: int = 1) -> None:
     connection = await get_db()
     await connection.execute(
@@ -454,9 +491,9 @@ async def activity_leaderboard(guild_id: int) -> list[dict]:
 
 async def get_member_preferences(guild_id: int, user_id: int) -> dict[str, bool]:
     connection = await get_db()
-    cursor = await connection.execute("SELECT roasting, media, pings, avatar_edits FROM member_preferences WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+    cursor = await connection.execute("SELECT roasting, media, pings, avatar_edits, flirting, introductions FROM member_preferences WHERE guild_id=? AND user_id=?", (guild_id, user_id))
     row = await cursor.fetchone()
-    return {key: bool(row[key]) if row else True for key in ("roasting", "media", "pings", "avatar_edits")}
+    return {key: bool(row[key]) if row else True for key in ("roasting", "media", "pings", "avatar_edits", "flirting", "introductions")}
 
 
 async def set_member_preferences(guild_id: int, user_id: int, updates: dict[str, bool]) -> None:
@@ -464,7 +501,7 @@ async def set_member_preferences(guild_id: int, user_id: int, updates: dict[str,
     # Specify the default explicitly: older databases may still declare DEFAULT 0.
     await connection.execute("INSERT OR IGNORE INTO member_preferences (guild_id,user_id,avatar_edits) VALUES (?,?,1)", (guild_id, user_id))
     for key, value in updates.items():
-        if key in {"roasting", "media", "pings", "avatar_edits"} and isinstance(value, bool):
+        if key in {"roasting", "media", "pings", "avatar_edits", "flirting", "introductions"} and isinstance(value, bool):
             await connection.execute(f"UPDATE member_preferences SET {key}=? WHERE guild_id=? AND user_id=?", (int(value), guild_id, user_id))
     await connection.commit()
 
@@ -476,6 +513,22 @@ async def get_dead_chat_opt_outs(guild_id: int) -> set[int]:
            WHERE guild_id=? AND (pings=0 OR roasting=0)""", (guild_id,)
     )
     return {row['user_id'] for row in await cursor.fetchall()}
+
+
+async def get_ping_opt_outs(guild_id: int) -> set[int]:
+    connection = await get_db()
+    cursor = await connection.execute(
+        "SELECT user_id FROM member_preferences WHERE guild_id=? AND pings=0", (guild_id,),
+    )
+    return {row["user_id"] for row in await cursor.fetchall()}
+
+
+async def get_ping_opt_outs(guild_id: int) -> set[int]:
+    connection = await get_db()
+    cursor = await connection.execute(
+        "SELECT user_id FROM member_preferences WHERE guild_id=? AND pings=0", (guild_id,),
+    )
+    return {row["user_id"] for row in await cursor.fetchall()}
 
 
 async def get_recent_messages(
@@ -600,6 +653,79 @@ async def update_member_profile(guild_id: int, user_id: int, display_name: str, 
         (guild_id, user_id, display_name, username),
     )
     await db.commit()
+
+
+async def record_impression_sample(guild_id: int, user_id: int, content: str, now: float) -> None:
+    """Keep six short direct-interaction samples, separately from factual memory."""
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO member_impressions (guild_id, user_id, interaction_count)
+           VALUES (?, ?, 1) ON CONFLICT(guild_id, user_id) DO UPDATE SET
+           interaction_count=interaction_count+1""", (guild_id, user_id),
+    )
+    await db.execute(
+        "INSERT INTO member_impression_samples (guild_id, user_id, content, created_at) VALUES (?, ?, ?, ?)",
+        (guild_id, user_id, content[:800], now),
+    )
+    await db.execute(
+        """DELETE FROM member_impression_samples WHERE guild_id=? AND user_id=? AND id NOT IN
+           (SELECT id FROM member_impression_samples WHERE guild_id=? AND user_id=?
+            ORDER BY id DESC LIMIT 6)""", (guild_id, user_id, guild_id, user_id),
+    )
+    await db.commit()
+
+
+async def claim_impression_review(guild_id: int, user_id: int, now: float) -> bool:
+    """Reserve one review per three new interactions, no more often than 15 minutes."""
+    db = await get_db()
+    cursor = await db.execute(
+        """UPDATE member_impressions SET reviewed_count=interaction_count, next_review_at=?
+           WHERE guild_id=? AND user_id=? AND interaction_count-reviewed_count>=3
+           AND next_review_at<=?""", (now + 900, guild_id, user_id, now),
+    )
+    await db.commit()
+    return cursor.rowcount == 1
+
+
+async def get_impression_samples(guild_id: int, user_id: int, since: float) -> list[str]:
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT content FROM member_impression_samples WHERE guild_id=? AND user_id=?
+           AND created_at>=? ORDER BY id""", (guild_id, user_id, since),
+    )
+    return [row["content"] for row in await cursor.fetchall()]
+
+
+async def get_member_impression(guild_id: int, user_id: int) -> dict | None:
+    db = await get_db()
+    cursor = await db.execute("SELECT * FROM member_impressions WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+    row = await cursor.fetchone()
+    return dict(row) if row else None
+
+
+async def save_member_impression(guild_id: int, user_id: int, impression: str,
+                                 affinity: int, evidence: str, now: float) -> None:
+    db = await get_db()
+    await db.execute(
+        """UPDATE member_impressions SET impression=?, affinity=?, evidence=?, updated_at=?
+           WHERE guild_id=? AND user_id=?""",
+        (impression[:240], affinity, evidence[:200], now, guild_id, user_id),
+    )
+    await db.commit()
+
+
+async def list_member_impressions(guild_id: int, since: float, *, least: bool = False) -> list[dict]:
+    db = await get_db()
+    # A no-roasting preference also excludes someone from negative public rankings.
+    direction = "ASC" if least else "DESC"
+    cursor = await db.execute(
+        f"""SELECT i.* FROM member_impressions i LEFT JOIN member_preferences p
+            ON p.guild_id=i.guild_id AND p.user_id=i.user_id
+            WHERE i.guild_id=? AND i.impression!='' AND i.updated_at>=?
+            AND (i.affinity>=0 OR COALESCE(p.roasting, 1)=1)
+            ORDER BY i.affinity {direction}, i.updated_at DESC LIMIT 12""", (guild_id, since),
+    )
+    return [dict(row) for row in await cursor.fetchall()]
 
 
 async def save_member_fact(guild_id: int, user_id: int, fact_key: str, content: str, evidence: str, source: str = "self_report") -> None:

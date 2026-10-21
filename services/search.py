@@ -146,7 +146,8 @@ async def image_search(query: str, count: int = 6) -> list[SearchItem]:
     return items
 
 
-async def summarize_results(query: str, results: list[SearchItem], mode: str = "search", *, include_links: bool = False) -> str:
+async def summarize_results(query: str, results: list[SearchItem], mode: str = "search", *, include_links: bool = False,
+                            language_request: str | None = None) -> str:
     """Create a short summary; visible sources are opt-in."""
     if not results:
         return ""
@@ -172,7 +173,8 @@ async def summarize_results(query: str, results: list[SearchItem], mode: str = "
             "content": f"Mode: {mode}\nQuery: {query}\n\nResults:\n{source_block}",
         },
     ]
-    reply = await llm.generate_visible_response(prompt, temperature=0.35, max_tokens=500, failure_reply="")
+    reply = await llm.generate_visible_response(prompt, temperature=0.35, max_tokens=500, failure_reply="",
+                                               language_request=query if language_request is None else language_request)
     return filter_links(reply, include_links)
 
 

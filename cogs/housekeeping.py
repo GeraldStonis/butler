@@ -66,7 +66,18 @@ def dead_chat_due(row: dict) -> bool:
             and float(row.get("idle_seconds") or 0) >= dead_chat_delay_seconds(row))
 
 
-async def generate_dead_chat_line(previous: str | None, count: int) -> str:
+async def generate_dead_chat_line(previous: str | None, count: int, *, savage: bool = False) -> str:
+    intensity = (
+        "The owner reports this chosen member ASKED for savage playful roasting. "
+        "Deliver a sharp, confident, cutting roast of their lurking, weak comebacks or "
+        "Discord theatrics, then bait one funny contribution to revive chat. Be more biting "
+        "than a polite tease: original comparisons and dry contempt for the performance, "
+        "not the person's worth. No apologies, disclaimers, generic service offers or "
+        "calls for others to pile on. Keep it clearly comic, never hateful or threatening. "
+        "Do not target appearance, protected traits, disability, trauma, sexuality or private "
+        "life, and do not invent biographical facts. "
+        if savage else ""
+    )
     for _ in range(2):
         text = await llm.generate_visible_response([
             {"role": "system", "content": config.load_persona()},
@@ -75,12 +86,13 @@ async def generate_dead_chat_line(previous: str | None, count: int) -> str:
                 "One or two short, sassy sentences, preferably saying 'ded chat'. Tease lurking "
                 "or a weak take, not identity or vulnerabilities. No threats or personal claims. "
                 "Do not include names, mentions, URLs, or placeholders; the application adds "
-                "one chosen member's mention. These are ONLY style examples, never copy them:\n"
+                "one chosen member's mention. " + intensity
+                + "These are ONLY style examples, never copy them:\n"
                 + "\n".join(line.replace('{member}, ', '') for line in random.sample(DEAD_CHAT_EXAMPLES, 3))
                 + "\nDo not repeat the previous nudge. Output only the new message."
             )},
             {"role": "user", "content": json.dumps({"previous_nudge": previous, "nudge_number": count + 1})},
-        ], temperature=0.95, max_tokens=600, failure_reply="")
+        ], temperature=0.95, max_tokens=600, failure_reply="", language_request="")
         text = filter_links(text)
         text = re.sub(r"<@[^>]*>|@(?:everyone|here)|\{member\}", "", text).strip()
         examples = {line.replace('{member}, ', '').casefold() for line in DEAD_CHAT_EXAMPLES}
@@ -188,6 +200,7 @@ class HousekeepingCog(commands.Cog):
     async def _maybe_nudge_dead_chat(self) -> None:
         if not config.DEAD_CHAT_ENABLED or engagement.dead_chat_quiet_now():
             return
+        gap = min(config.AUTONOMOUS_MIN_GAP_SECONDS, max(1, config.DEAD_CHAT_IDLE_SECONDS))
 
         candidates = await db.get_channel_idle_candidates(config.DEAD_CHAT_CHANNEL_IDS or None)
         for row in candidates:
@@ -199,7 +212,7 @@ class HousekeepingCog(commands.Cog):
                 continue
             if config.DEAD_CHAT_CHANNEL_IDS and channel.id not in config.DEAD_CHAT_CHANNEL_IDS:
                 continue
-            if not row.get("last_user_id") or not await engagement.can_post(channel.id):
+            if not row.get("last_user_id") or not await engagement.can_post(channel.id, min_gap_seconds=gap):
                 continue
             retry_key = f"engagement_retry:{channel.id}"
             try:
@@ -223,13 +236,17 @@ class HousekeepingCog(commands.Cog):
                     continue
                 # Provider failures must not cause a fresh LLM request every tick.
                 await db.set_state(retry_key, str(time.time() + 180))
-                line = await generate_dead_chat_line(previous, int(fresh[0].get("dead_ping_count") or 0))
+                line = await generate_dead_chat_line(previous, int(fresh[0].get("dead_ping_count") or 0),
+                                                     savage=member.id == config.DEAD_CHAT_PREFERRED_USER_ID)
                 if not line:
                     continue
                 latest = await db.get_channel_idle_candidates([channel.id])
                 if not latest or latest[0]["last_message_at"] != fresh[0]["last_message_at"]:
                     continue
-                if engagement.dead_chat_quiet_now() or not await engagement.can_post(channel.id):
+                if engagement.dead_chat_quiet_now() or not await engagement.can_post(channel.id, min_gap_seconds=gap):
+                    continue
+                # A member can revoke permission while the model is generating.
+                if member.id in await db.get_dead_chat_opt_outs(channel.guild.id):
                     continue
                 sent = await channel.send(
                     f"{member.mention} {line}",
@@ -242,7 +259,17 @@ class HousekeepingCog(commands.Cog):
                 await db.set_state(retry_key, "0")
                 await memory.log_delivery(sent)
                 await engagement.mark_sent(channel.id)
-                await db.set_state(f"dead_chat_target:{channel.id}", str(member.id))
+                await self._record_dead_chat_target(channel.id, member.id)
+
+    async def _record_dead_chat_target(self, channel_id: int, member_id: int) -> None:
+        key = f"dead_chat_target:{channel_id}"
+        previous = await db.get_state(key)
+        try:
+            streak = int(await db.get_state(f"dead_chat_target_streak:{channel_id}") or 1)
+        except ValueError:
+            streak = 1
+        await db.set_state(f"dead_chat_target_streak:{channel_id}", str(max(1, streak + 1) if previous == str(member_id) else 1))
+        await db.set_state(key, str(member_id))
 
     async def _pick_random_member(self, channel: discord.TextChannel) -> discord.Member | None:
         opted_out = await db.get_dead_chat_opt_outs(channel.guild.id)
@@ -252,6 +279,18 @@ class HousekeepingCog(commands.Cog):
             for member in channel.members
             if not member.bot and member.id != config.OWNER_ID and member.id not in opted_out
         ]
+        preferred = next((m for m in eligible if m.id == config.DEAD_CHAT_PREFERRED_USER_ID), None)
+        if preferred and config.DEAD_CHAT_PREFERRED_CHANCE > 0:
+            others = [m for m in eligible if m.id != preferred.id]
+            if not others:
+                return preferred
+            try:
+                streak = int(await db.get_state(f"dead_chat_target_streak:{channel.id}") or 1) if previous == str(preferred.id) else 0
+            except ValueError:
+                streak = 1
+            if streak < 2 and random.random() < config.DEAD_CHAT_PREFERRED_CHANCE:
+                return preferred
+            eligible = others
         varied = [m for m in eligible if str(m.id) != previous]
         candidates = varied or eligible
         return random.choice(candidates) if candidates else None

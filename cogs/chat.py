@@ -17,8 +17,8 @@ from discord.ext import commands
 
 import config
 from services import actions, database as db, emoji_filter, intent, llm, memory
-from services.response_text import requests_links
-from services import social, conversation, avatar_edits
+from services.response_text import FALLBACK_REACTION, requests_links
+from services import social, conversation, avatar_edits, charm, opinions
 
 log = logging.getLogger("nixi.chat")
 
@@ -189,13 +189,14 @@ class ChatCog(commands.Cog):
             ))
         if mode is None:
             return
-        preferences = {"roasting": True, "media": True, "pings": True, "avatar_edits": True}
-        updates = {}
-        if guild_id is not None:
-            updates = social.preference_updates(content) if mode != "OWNER_UNAVAILABLE" else {}
-            if updates:
-                await db.set_member_preferences(guild_id, message.author.id, updates)
-            preferences = await db.get_member_preferences(guild_id, message.author.id)
+        preference_scope = guild_id if guild_id is not None else 0
+        updates = social.preference_updates(content) if mode != "OWNER_UNAVAILABLE" else {}
+        if updates:
+            await db.set_member_preferences(preference_scope, message.author.id, updates)
+        preferences = await db.get_member_preferences(preference_scope, message.author.id)
+
+        if opinions.can_observe(message, mode):
+            memory.background(opinions.observe(guild_id, message.author.id, content))
 
         log.info(
             "Triggered [%s] by user %d in channel %d", mode, message.author.id, message.channel.id,
@@ -301,6 +302,7 @@ class ChatCog(commands.Cog):
                 nixi_author_id=self.bot.user.id,
                 owner_notified=owner_notified,
                 reply_to=getattr(getattr(message, "reference", None), "resolved", None),
+                introduction_opportunity=await charm.introduction_opportunity(message, mode, preferences),
             )
 
             if guest_kind is not None:
@@ -316,10 +318,13 @@ class ChatCog(commands.Cog):
                     "challenge or default to 'Shush'. Tool delivery is handled by the application; "
                     "never pretend to fetch or send something that was not delivered."
                 )})
-            reply_text = await conversation.generate_reply(context, message.channel.id, content, nixi_author_id=self.bot.user.id)
+            reply_text = await conversation.generate_reply(context, message.channel.id, content,
+                nixi_author_id=self.bot.user.id, current_author_id=message.author.id)
             reply_text = await emoji_filter.filter_response(
                 reply_text, message.guild, allow_links=requests_links(content)
             )
+            if message.author.id == config.OWNER_ID and not reply_text.strip():
+                reply_text = FALLBACK_REACTION
             refused_guest_request = False
             if guest_kind is not None and social.contains_baby_talk(reply_text) and not social.is_phrase_definition(content):
                 reply_text = await self._guest_retort(message.channel.id, content)
@@ -335,6 +340,7 @@ class ChatCog(commands.Cog):
             pending_reaction = None
             if (mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"} and not refused_guest_request
                     and reply_text.strip() and preferences["media"] and not conversation.serious_message(content)
+                    and not (message.author.id == config.OWNER_ID and conversation.requests_verbatim_text(content))
                     and reply_text.strip().lower() != "shush."):
                 avatar_image, reaction_media, pending_reaction = await self._quick_reaction(message, reply_text)
 
@@ -342,7 +348,7 @@ class ChatCog(commands.Cog):
             return
 
         reply_kwargs = {"embed": actions._media_embed(reaction_media)} if reaction_media else {}
-        delivered_text = "" if reaction_media and reaction_media.standalone else reply_text
+        delivered_text = "" if reaction_media and reaction_media.standalone and message.author.id != config.OWNER_ID else reply_text
         try:
             sent = await avatar_edits.send_reply(message, avatar_image, delivered_text or None) if avatar_image else None
             if sent is None:
@@ -381,9 +387,10 @@ class ChatCog(commands.Cog):
         if (
             config.ENABLE_NATURAL_OWNER_ACTIONS
             and message.author.id == config.OWNER_ID
-            and intent.heuristic_intent(message.content, list(message.mentions)) is not None
         ):
-            return "DIRECT_ADDRESS"
+            request = intent.heuristic_intent(message.content, list(message.mentions))
+            if request is not None and request.name != "chat":
+                return "DIRECT_ADDRESS"
 
         if self.bot.user in message.mentions:  # type: ignore[operator]
             return "DIRECT_ADDRESS"
