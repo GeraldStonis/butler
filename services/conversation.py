@@ -189,13 +189,15 @@ async def generate_reply(context: list[dict], channel_id: int, content: str, *, 
     )})
     prompt.insert(-1, {'role': 'system', 'content': pacing})
     reply = await llm.generate_visible_response(prompt, temperature=0.4 if serious or detail else 0.9,
-                                        max_tokens=1000 if detail and not brief else 600, failure_reply="")
+                                        max_tokens=1000 if detail and not brief else 600, failure_reply="",
+                                        language_request=content)
     if reply and not serious and not detail and not exact_output and repeats_recent(reply, previous):
         prompt.insert(-1, {'role': 'system', 'content': (
             "Your last draft recycled a recent reply. Take a different conversational approach and "
             "wording while answering the actual message. Do not quote or explain this instruction."
         )})
-        fresh = await llm.generate_visible_response(prompt, temperature=1.0, max_tokens=600, failure_reply="")
+        fresh = await llm.generate_visible_response(prompt, temperature=1.0, max_tokens=600,
+                                                   failure_reply="", language_request=content)
         if fresh and not repeats_recent(fresh, previous):
             return fresh
         return reply if is_owner else ""

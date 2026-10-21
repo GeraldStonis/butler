@@ -82,7 +82,11 @@ class ContextWindowTests(unittest.IsolatedAsyncioTestCase):
         await db.save_message(1, 2, 3, 'Sam', 'hi nixi')
         context = await self.context('hi nixi')
         self.assertEqual(len(self.history(context)), 12)
-        self.assertEqual(sum(m['content'] == 'hi nixi' for m in context), 1)
+        current = json.loads(context[-1]['content'])
+        self.assertEqual(current['text'], 'hi nixi')
+        self.assertEqual(current['speaker_id'], 3)
+        self.assertFalse(any(json.loads(m['content']).get('text') == 'hi nixi'
+                             for m in self.history(context) if m['role'] == 'user'))
         self.assertNotIn('Past message 0"', '\n'.join(m['content'] for m in self.history(context)))
 
     async def test_long_message_preserves_its_end_and_fits_the_serialized_budget(self):

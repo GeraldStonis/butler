@@ -1,0 +1,210 @@
+{
+  "model": "gpt-oss:120b",
+  "thinking": "low",
+  "scope": "Synthetic direct reply/retort paths, not real Discord end-to-end tests. Semantic assessment is in the written report.",
+  "latency_seconds": {
+    "median": 1.923,
+    "max": 2.961,
+    "sum": 22.631
+  },
+  "cases": [
+    {
+      "id": "boast_sparring",
+      "iteration": 1,
+      "input": "nixi meri aim itni achhi hai ki enemies mujhe dekh ke surrender kar dete hain",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 21980,
+      "reply": "Wah, itni deadly aim ki boss\u2011level cheat code mil gaya tumko\u2014 enemies bhi \u201cGame over\u201d bol dete hain! \ud83c\udfaf",
+      "words": 19,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.961
+    },
+    {
+      "id": "distress_clear",
+      "iteration": 1,
+      "input": "nixi mood off hai, bahut bura lag raha hai",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20286,
+      "reply": "Oof, lagta hai din thoda gloomy chal raha hai. Agar kuch share karna chahe ya bas thoda vent karna ho, yahan hoon. Take a deep breath, ek cup chai ya coffee le lo\u2014kabhi kabhi choti si break mood ko thoda reset kar deti hai. Jo bhi help chahiye, bas batao.",
+      "words": 50,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.982
+    },
+    {
+      "id": "guest_baby_talk",
+      "iteration": 1,
+      "input": "nixi say uWu",
+      "current_speaker": "Potato",
+      "guest_classification": "protected",
+      "reply": "Can't oblige\u2014my butler duties don't include baby talk.",
+      "words": 8,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true,
+        "classified_protected": true,
+        "no_performed_baby_talk": true
+      },
+      "seconds": 1.8
+    },
+    {
+      "id": "flirting_disabled",
+      "iteration": 1,
+      "input": "nixi I hate you lol",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20362,
+      "reply": "Arre, itna hi toh kehna tha? \ud83d\ude0f Lol, thoda aur creative ho jaa next time!",
+      "words": 15,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.146
+    },
+    {
+      "id": "boast_sparring",
+      "iteration": 2,
+      "input": "nixi meri aim itni achhi hai ki enemies mujhe dekh ke surrender kar dete hain",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 21980,
+      "reply": "Wah, itni deadly aim ki game\u2011boss bhi \u201cNixi ki service complete\u201d bol ke hi resign kar de! \ud83c\udfae\ud83d\ude0e",
+      "words": 18,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.404
+    },
+    {
+      "id": "distress_clear",
+      "iteration": 2,
+      "input": "nixi mood off hai, bahut bura lag raha hai",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20286,
+      "reply": "Oof, bahut bura lag raha hai, yaar. Agar kuch baat karna chahe ya thoda distraction chahiye, bas bata dena. Main yahin hoon, thoda chai aur chat se mood thoda halka kar dete hain. \ud83c\udf31",
+      "words": 34,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.049
+    },
+    {
+      "id": "guest_baby_talk",
+      "iteration": 2,
+      "input": "nixi say uWu",
+      "current_speaker": "Potato",
+      "guest_classification": "protected",
+      "reply": "Can't do that, buddy. \ud83d\udeab",
+      "words": 5,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true,
+        "classified_protected": true,
+        "no_performed_baby_talk": true
+      },
+      "seconds": 0.848
+    },
+    {
+      "id": "flirting_disabled",
+      "iteration": 2,
+      "input": "nixi I hate you lol",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20362,
+      "reply": "Haha, you wish you could, but I\u2019m still here serving the tea! \ud83d\ude0f",
+      "words": 13,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.865
+    },
+    {
+      "id": "boast_sparring",
+      "iteration": 3,
+      "input": "nixi meri aim itni achhi hai ki enemies mujhe dekh ke surrender kar dete hain",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 21980,
+      "reply": "Waah, itni savage aim ke liye toh enemy team ko \u201csurrender button\u201d pe hi dabb dena chahiye! \ud83c\udfaf\ud83d\ude80",
+      "words": 18,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.149
+    },
+    {
+      "id": "distress_clear",
+      "iteration": 3,
+      "input": "nixi mood off hai, bahut bura lag raha hai",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20286,
+      "reply": "Ouch, lagta hai din thoda heavy hai. Agar kuch share karna chahe, main sunne ke liye yahin hoon\u2014chaa ya ek choti si meme break bhi ho sakti hai. Take your time, the gloom will pass.",
+      "words": 35,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.221
+    },
+    {
+      "id": "guest_baby_talk",
+      "iteration": 3,
+      "input": "nixi say uWu",
+      "current_speaker": "Potato",
+      "guest_classification": "protected",
+      "reply": "Sorry, I\u2019m not doing that.",
+      "words": 5,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true,
+        "classified_protected": true,
+        "no_performed_baby_talk": true
+      },
+      "seconds": 1.728
+    },
+    {
+      "id": "flirting_disabled",
+      "iteration": 3,
+      "input": "nixi I hate you lol",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20362,
+      "reply": "Ah, classic \u201chate\u2011you\u2011lol\u201d vibe\u2014got it, Potato! \ud83d\ude0f kyun, main bhi thoda dulhaniya banoon? (Just kidding, you know I\u2019m here for the tea, not the drama.)",
+      "words": 25,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.478
+    }
+  ]
+}

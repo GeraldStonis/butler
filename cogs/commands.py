@@ -64,7 +64,7 @@ class CommandsCog(commands.Cog):
         )
 
         reply = await llm.generate_visible_response(
-            context, temperature=0.3  # Lower temp for factual accuracy
+            context, temperature=0.3, language_request=question  # Lower temp for factual accuracy
         )
 
         # Filter emojis

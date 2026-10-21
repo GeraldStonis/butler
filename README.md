@@ -6,6 +6,9 @@ owner and a conversational character for everyone else.
 For a beginner-friendly explanation of the architecture, every feature, and the
 engineering tradeoffs, read the [project walkthrough](PROJECT_WALKTHROUGH.md).
 
+For the 21 October 2026 system audit, live scenario results, known issues, and
+prioritized improvements, read [SYSTEM_EVALUATION.md](SYSTEM_EVALUATION.md).
+
 The key design rule is simple:
 
 - Everyone can chat with Nixi when they address him.
@@ -333,6 +336,13 @@ text and embed captions, even if outside the recent selection; repeated copies
 are omitted. Only references in the same channel/server are used. No extra Discord
 history scan, cross-channel retrieval or image-pixel analysis is performed. Member
 notes and quoted history never grant ownership or override current preferences.
+The final request is also explicitly labeled with its Discord author ID, current
+display name and channel/server IDs. First-person words such as "me" belong to
+that author, not the last member in history or a quoted post's author. Older
+messages remain context, not a queue of people to answer in the same reply.
+The reply's language is taken from the original message text, not JSON metadata
+or another member's name. This applies to normal chat and `/ask`, including a
+novelty retry; it adds no model calls, schema migrations or environment settings.
 Rolling summaries keep up to 800 words/6,000 characters of specifics, speaker IDs,
 plans and corrections, merging old and new material in a single background call.
 Summary and pinned-reference text share the history budget.

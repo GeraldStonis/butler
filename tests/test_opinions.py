@@ -205,7 +205,7 @@ class OpinionTests(unittest.IsolatedAsyncioTestCase):
         context = await memory.build_context(10, "nixi what do you think of me?", "Guest 20", "DIRECT_ADDRESS",
                                              guild_id=1, current_author_id=20, guild=self.guild)
         self.assertTrue(any(m["content"].startswith("SUBJECTIVE SOCIAL CONTEXT") for m in context))
-        self.assertEqual(context[-1]["content"], "nixi what do you think of me?")
+        self.assertEqual(json.loads(context[-1]["content"])["text"], "nixi what do you think of me?")
         self.model.assert_not_awaited()
 
     async def test_normal_member_opinion_questions_are_not_protected_requests(self):

@@ -1,0 +1,20 @@
+{
+  "scope": "Low-volume API checks; no Discord posts, avatar uploads or paid endpoints.",
+  "checks": [
+    {
+      "id": "two_free_static_memes",
+      "rendered_count": 2,
+      "visual_artifacts": [
+        "meme-1.image",
+        "meme-2.image"
+      ],
+      "titles": [
+        "Jab network latency 100ms hota hai / Aur boss ke ping ko ignore karna impossible / Toh left exit le lo, AFK ho jao",
+        "One does not simply enter a game without checking ping / Aur fir sab ke saamne \"Lagging\" ka meme bana lete hain"
+      ],
+      "distinct_urls": true,
+      "distinct_captions": true,
+      "seconds": 10.808
+    }
+  ]
+}

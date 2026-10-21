@@ -33,7 +33,8 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         await db.save_message(1, 2, 3, 'Guest', 'nixi hello')
         context = await memory.build_context(1, 'nixi hello', 'Guest', 'DIRECT_ADDRESS', current_author_id=3, nixi_author_id=99)
         data = [json.loads(m['content']) for m in context if m['content'].startswith('{"speaker"')]
-        self.assertEqual(sum(m['content'] == 'nixi hello' for m in context), 1)
+        self.assertEqual(json.loads(context[-1]['content'])['text'], 'nixi hello')
+        self.assertFalse(any(row['id'] == 3 and row['text'] == 'nixi hello' for row in data))
         assistants = [m for m in context if m['role'] == 'assistant']
         self.assertEqual(len(assistants), 1)
         self.assertIn('A real previous reply', assistants[0]['content'])

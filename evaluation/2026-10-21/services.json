@@ -1,0 +1,64 @@
+{
+  "scope": "Low-volume API checks; no Discord posts, avatar uploads or paid endpoints.",
+  "checks": [
+    {
+      "id": "web_search",
+      "results": 2,
+      "titles": [
+        "asyncio \u2014 Asynchronous I/O \u2014 Python 3.15.0 documentation",
+        "A conceptual overview of asyncio \u2014 Python 3.15.0 documentation"
+      ],
+      "seconds": 2.383
+    },
+    {
+      "id": "news_search",
+      "results": 1,
+      "titles": [
+        "AI Anxiety Rises as Technology Joins Americans\u2019 Top 10 Fears \u2013 La Voce di New York"
+      ],
+      "seconds": 1.947
+    },
+    {
+      "id": "image_search",
+      "results": 2,
+      "image_urls_present": true,
+      "seconds": 16.652
+    },
+    {
+      "id": "tea_gif",
+      "error": {
+        "type": "RuntimeError",
+        "http_status": null
+      },
+      "seconds": 0.689
+    },
+    {
+      "id": "two_free_static_memes",
+      "rendered_count": 2,
+      "titles": [
+        "When Discord ping shows up while gaming / Game: *dies* | Me: *pings back*",
+        "When Discord says 'Join voice chat' but you're on a boss fight / Press button: Join voice \ud83d\udcde / Press button: Keep killing boss \ud83c\udfae"
+      ],
+      "distinct_urls": true,
+      "distinct_captions": true,
+      "seconds": 8.425
+    },
+    {
+      "id": "trivia",
+      "question_found": true,
+      "four_choices": true,
+      "seconds": 1.273
+    },
+    {
+      "id": "cards",
+      "cards": 6,
+      "all_ranks_valid": true,
+      "seconds": 1.289
+    },
+    {
+      "id": "cat_metadata",
+      "valid_identifier": true,
+      "seconds": 1.306
+    }
+  ]
+}
