@@ -1,0 +1,366 @@
+{
+  "local_settings": {
+    "model": "gpt-oss:120b",
+    "thinking": "low",
+    "timezone": "Asia/Kolkata",
+    "startup": "required values present (not an authentication test)",
+    "flags": {
+      "MORNING_NEWS_ENABLED": true,
+      "DEAD_CHAT_ENABLED": true,
+      "STICKER_SPAM_ENABLED": true,
+      "MEME_DROP_ENABLED": true,
+      "MUSIC_DROP_ENABLED": true,
+      "ACTIVITIES_ENABLED": true,
+      "AUTOMATIC_MEDIA_ENABLED": true,
+      "AVATAR_EDITS_ENABLED": true,
+      "IMGFLIP_GIF_CAPTIONS_ENABLED": false
+    },
+    "tuning": {
+      "DEAD_CHAT_IDLE_SECONDS": 60,
+      "STICKER_SPAM_INTERVAL_SECONDS": 15,
+      "MEME_DROP_INTERVAL_SECONDS": 300,
+      "AUTOMATIC_MEDIA_CHANCE": 0.15,
+      "AUTOMATIC_MEDIA_COOLDOWN_SECONDS": 300,
+      "CONTEXT_MESSAGE_LIMIT": 100,
+      "CONTEXT_CHAR_BUDGET": 48000,
+      "LLM_TIMEOUT_SECONDS": 45.0,
+      "LLM_MAX_CONCURRENT": 3
+    },
+    "credentials_present": {
+      "OLLAMA_API_KEY": true,
+      "TAVILY_API_KEY": true,
+      "GIPHY_API_KEY": true,
+      "IMGFLIP_API_KEY": true,
+      "CLOUDFLARE_API_TOKEN": false,
+      "BRAVE_SEARCH_API_KEY": false,
+      "TENOR_API_KEY": false
+    },
+    "channel_configured": {
+      "MORNING_NEWS_CHANNEL_ID": true,
+      "DEAD_CHAT_CHANNEL_IDS": true,
+      "STICKER_SPAM_CHANNEL_ID": true,
+      "MEME_DROP_CHANNEL_ID": true,
+      "MUSIC_CHANNEL_IDS": true
+    },
+    "quiet_hours": {
+      "general": "",
+      "dead_chat": "00:00-08:00",
+      "spam": "00:00-08:00"
+    },
+    "railway_database_path": false,
+    "avatar_ready_config_only": false
+  },
+  "routes": [
+    {
+      "id": "tea_request",
+      "input": "nixi serve tea",
+      "expected": "tea",
+      "actual_fast_route": "tea",
+      "mock_delivery_observed": true,
+      "status": "pass"
+    },
+    {
+      "id": "coffee_request",
+      "input": "nixi serve coffee",
+      "expected": "coffee",
+      "actual_fast_route": "coffee",
+      "mock_delivery_observed": true,
+      "status": "pass"
+    },
+    {
+      "id": "handshake_no_target",
+      "input": "nixi give me a handshake",
+      "expected": "action_gif",
+      "actual_fast_route": "action_gif",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "punch_target",
+      "input": "nixi punch <@200>",
+      "expected": "action_gif",
+      "actual_fast_route": "action_gif",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "avatar_scene",
+      "input": "nixi make <@200> eat grass in a field",
+      "expected": "avatar_edit",
+      "actual_fast_route": "avatar_edit",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "meme_request",
+      "input": "nixi send a meme",
+      "expected": "meme",
+      "actual_fast_route": "meme",
+      "mock_delivery_observed": true,
+      "status": "pass"
+    },
+    {
+      "id": "song_request",
+      "input": "nixi play a party song",
+      "expected": "song",
+      "actual_fast_route": "song",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "owner_random_ping",
+      "input": "nixi ping someone random",
+      "expected": "member_ping",
+      "actual_fast_route": "member_ping",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "literal_not_action",
+      "input": "nixi say \"ping someone random\"",
+      "expected": "chat",
+      "actual_fast_route": "chat",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "negated_meme",
+      "input": "nixi don't send a meme",
+      "expected": "chat",
+      "actual_fast_route": "chat",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "negated_tea",
+      "input": "nixi do not serve tea",
+      "expected": "chat",
+      "actual_fast_route": "chat",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "negated_game",
+      "input": "nixi do not start trivia",
+      "expected": "chat",
+      "actual_fast_route": "chat",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "explain_tea",
+      "input": "nixi explain how to brew tea",
+      "expected": "chat",
+      "actual_fast_route": "chat",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "explain_coffee",
+      "input": "nixi how do I brew coffee?",
+      "expected": "chat",
+      "actual_fast_route": "chat",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "discuss_news",
+      "input": "nixi why is morning news useful?",
+      "expected": "chat",
+      "actual_fast_route": "chat",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "negated_image",
+      "input": "nixi don't find an image of a castle",
+      "expected": "chat",
+      "actual_fast_route": "chat",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "negated_gif",
+      "input": "nixi don't send a gif of dancing",
+      "expected": "chat",
+      "actual_fast_route": "chat",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "news_request",
+      "input": "nixi get the morning news",
+      "expected": "news",
+      "actual_fast_route": "news",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    },
+    {
+      "id": "image_request",
+      "input": "nixi find an image of a castle",
+      "expected": "image_search",
+      "actual_fast_route": "image_search",
+      "mock_delivery_observed": true,
+      "status": "pass"
+    },
+    {
+      "id": "web_request",
+      "input": "nixi search for current Kolkata weather",
+      "expected": "web_search",
+      "actual_fast_route": "web_search",
+      "mock_delivery_observed": false,
+      "status": "pass"
+    }
+  ],
+  "playlist": {
+    "valid_entries": 928,
+    "fields": [
+      "artist",
+      "category",
+      "languages",
+      "moods",
+      "title",
+      "youtubeId"
+    ],
+    "categories": {
+      "(uncategorized)": 48,
+      "vibes": 880
+    }
+  },
+  "song_matches": {
+    "(random)": {
+      "matched": true,
+      "title": "Swim",
+      "category": "vibes"
+    },
+    "sad": {
+      "matched": true,
+      "title": "Tum Hi Ho",
+      "category": "vibes"
+    },
+    "party": {
+      "matched": true,
+      "title": "Starboy",
+      "category": "vibes"
+    },
+    "happy": {
+      "matched": true,
+      "title": "Risk",
+      "category": null
+    },
+    "chill": {
+      "matched": true,
+      "title": "Just The Two Of Us",
+      "category": null
+    },
+    "romantic": {
+      "matched": true,
+      "title": "Tera Hone Laga Hoon",
+      "category": "vibes"
+    },
+    "Hindi": {
+      "matched": true,
+      "title": "Tum Se Hi",
+      "category": "vibes"
+    },
+    "Assamese": {
+      "matched": false,
+      "title": null,
+      "category": null
+    }
+  },
+  "private_fact_probe": {
+    "synthetic_private_fact_in_public_context": true,
+    "note": "The fake source channel was private; no real Discord or member content was used."
+  },
+  "tool_delivery_logging": [
+    {
+      "action": "tea",
+      "reply_sent": true,
+      "delivery_recorded": true
+    },
+    {
+      "action": "coffee",
+      "reply_sent": true,
+      "delivery_recorded": true
+    },
+    {
+      "action": "gif_search",
+      "reply_sent": true,
+      "delivery_recorded": true
+    },
+    {
+      "action": "image_search",
+      "reply_sent": true,
+      "delivery_recorded": true
+    },
+    {
+      "action": "cat",
+      "reply_sent": true,
+      "delivery_recorded": true
+    },
+    {
+      "action": "web_search",
+      "reply_sent": true,
+      "delivery_recorded": true
+    },
+    {
+      "action": "news",
+      "reply_sent": true,
+      "delivery_recorded": true
+    }
+  ],
+  "comfort_request_variants": [
+    {
+      "input": "nixi do not ping me",
+      "expected_update": {
+        "pings": false
+      },
+      "actual_updates": {
+        "pings": false
+      },
+      "status": "pass"
+    },
+    {
+      "input": "nixi stop tagging me",
+      "expected_update": {
+        "pings": false
+      },
+      "actual_updates": {
+        "pings": false
+      },
+      "status": "pass"
+    },
+    {
+      "input": "nixi mujhe ping mat karna",
+      "expected_update": {
+        "pings": false
+      },
+      "actual_updates": {
+        "pings": false
+      },
+      "status": "pass"
+    },
+    {
+      "input": "nixi mujhe roast mat kar",
+      "expected_update": {
+        "roasting": false
+      },
+      "actual_updates": {
+        "roasting": false
+      },
+      "status": "pass"
+    },
+    {
+      "input": "nixi mere se flirt mat kar",
+      "expected_update": {
+        "flirting": false
+      },
+      "actual_updates": {
+        "flirting": false
+      },
+      "status": "pass"
+    }
+  ],
+  "scope": "Local configuration and in-memory synthetic tests, not Railway runtime or real Discord permissions."
+}

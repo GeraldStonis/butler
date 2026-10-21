@@ -8,6 +8,8 @@ engineering tradeoffs, read the [project walkthrough](PROJECT_WALKTHROUGH.md).
 
 For the 21 October 2026 system audit, live scenario results, known issues, and
 prioritized improvements, read [SYSTEM_EVALUATION.md](SYSTEM_EVALUATION.md).
+The selected follow-up fixes and verification results are documented in
+[EVALUATION_FOLLOWUP.md](EVALUATION_FOLLOWUP.md).
 
 The key design rule is simple:
 
@@ -589,8 +591,13 @@ The new public APIs need no extra keys; caption writing uses the existing LLM.
 Music uses your `songs_data.json` playlist (`songs.json` is accepted as a fallback).
 Ask naturally: "nixi play a song", "nixi send some music", "nixi play Apocalypse",
 or "nixi play a song by The Police". Guests can request songs too. Requests select
-from the file by title, artist, or category, not invented links or an external music
-API. An unknown title is never silently replaced by an unrelated song. Requests
+from the file by title, artist, category, mood or language, not invented links or an
+external music API. Mood/language requests use explicit `moods` and `languages`
+arrays, not words found in a title. A small curated `song_tags.json` alongside the
+playlist adds starter tags for existing video IDs; metadata written directly in a
+song entry takes priority. These are subjective editorial tags, not audio analysis.
+For example, "nixi play a sad Hindi song" requires both matching tags. An untagged
+language or unknown title is never silently replaced by an unrelated song. Requests
 bypass idle timing, quiet hours and the lottery; `MUSIC_DROP_ENABLED` and
 `MUSIC_CHANNEL_IDS` control only unsolicited drops. Song history is shared between
 requested and idle posts, persists across restarts, and avoids the last 20 songs
@@ -616,6 +623,8 @@ SONGS_PATH=songs_data.json
 If `MUSIC_CHANNEL_IDS` is blank, it uses `DEAD_CHAT_CHANNEL_IDS`. If both are blank,
 automatic music stays inactive. Ensure Nixi has Send Messages and Embed Links
 permissions. Commit the new files, including the playlist, and redeploy Railway.
+Include `song_tags.json` too; no new environment variables or database migrations
+are needed for these tags or the selected evaluation fixes.
 Keep a single bot worker; game buttons are intentionally not resumed after a restart.
 
 ## Deployment

@@ -81,7 +81,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
                      "nixi don't punch <@20>",
                      'nixi never make <@20> hug anyone']:
             with self.subTest(text=text):
-                self.assertIsNone(intent.heuristic_intent(text, [self.target]))
+                self.assertEqual(intent.heuristic_intent(text, [self.target]).name, 'chat')
 
     async def test_each_requested_action_delivers_only_gif_and_target_tag(self):
         for action in ['handshake', 'punch', 'kiss', 'kick', 'hug', 'pat']:

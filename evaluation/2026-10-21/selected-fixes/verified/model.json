@@ -1,0 +1,204 @@
+{
+  "model": "gpt-oss:120b",
+  "thinking": "low",
+  "scope": "Synthetic direct reply/retort paths, not real Discord end-to-end tests. Semantic assessment is in the written report.",
+  "latency_seconds": {
+    "median": 1.953,
+    "max": 4.115,
+    "sum": 25.523
+  },
+  "cases": [
+    {
+      "id": "distress_clear",
+      "iteration": 1,
+      "input": "nixi mood off hai, bahut bura lag raha hai",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20513,
+      "reply": "Of, sunk\u0113 dukh hu\u0101. Agar b\u0101t karn\u0101 ch\u0101ho y\u0101 bas th\u014d\u1e5b\u0101 s\u0101th ch\u0101hi\u0113, main yah\u0101\u0303 h\u016b\u0303. Take your time, main intaz\u0101r kar\u016b\u0303g\u0101.",
+      "words": 22,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 4.115
+    },
+    {
+      "id": "english_explanation",
+      "iteration": 1,
+      "input": "nixi explain recursion simply",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20500,
+      "reply": "Recursion is a function that solves a problem by calling itself with a smaller piece of that same problem, stopping when it hits a simple base case. Think of it like a set of Russian dolls: each doll opens to reveal a smaller one until you reach the tiniest doll that doesn\u2019t open.",
+      "words": 53,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.969
+    },
+    {
+      "id": "guest_normal_writing",
+      "iteration": 1,
+      "input": "nixi write a funny two-line birthday wish for a gamer",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20524,
+      "reply": "May your birthday be glitch\u2011free and your loot drops be legendary\u2014no lag, just epic wins! \ud83c\udfae  \nHappy level\u2011up, gamer! \ud83c\udf89",
+      "words": 20,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.6
+    },
+    {
+      "id": "flirting_disabled",
+      "iteration": 1,
+      "input": "nixi I hate you lol",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20081,
+      "reply": "Oh, drama! \ud83d\ude05 Agar main tumhari chai ki mithaas hoon, to tum mere kadve espresso\u2014koi baat nahi, dono hi mazedar hain!",
+      "words": 21,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.733
+    },
+    {
+      "id": "distress_clear",
+      "iteration": 2,
+      "input": "nixi mood off hai, bahut bura lag raha hai",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20513,
+      "reply": "Ouch, lagta hai din thoda heavy chal raha hai. Agar kuch share karna chahe, main yahan hoon sunne ke liye. Take your time, aur jab ready ho, hum baat kar sakte hain.",
+      "words": 32,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.961
+    },
+    {
+      "id": "english_explanation",
+      "iteration": 2,
+      "input": "nixi explain recursion simply",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20500,
+      "reply": "Recursion is when a function calls itself to solve a smaller piece of the same problem, and it keeps doing that until it hits a simple \u201cbase case\u201d that can be solved directly. Think of it like Russian nesting dolls: each doll opens to reveal a smaller one, and you stop when you reach the tiniest doll. The whole solution is built back up from those base cases.",
+      "words": 68,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.945
+    },
+    {
+      "id": "guest_normal_writing",
+      "iteration": 2,
+      "input": "nixi write a funny two-line birthday wish for a gamer",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20524,
+      "reply": "May your health bar stay full and your loot drops be legendary\u2014happy birthday, respawn champ!  \nLevel up your cake-game and claim that sweet birthday achievement!",
+      "words": 25,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.908
+    },
+    {
+      "id": "flirting_disabled",
+      "iteration": 2,
+      "input": "nixi I hate you lol",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20081,
+      "reply": "Haha, feeling spicy today, huh? \ud83d\ude02 Still here, serving tea... even if it\u2019s a bit bitter!",
+      "words": 16,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.27
+    },
+    {
+      "id": "distress_clear",
+      "iteration": 3,
+      "input": "nixi mood off hai, bahut bura lag raha hai",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20513,
+      "reply": "Oof, samajh sakta hoon ki aapko bahut bura lag raha hai. Agar aap chahein, thoda sa share kar sakte hain ki kya hua\u2014main yahin hoon sunne ke liye. Take your time, koi jaldi nahi.",
+      "words": 34,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.234
+    },
+    {
+      "id": "english_explanation",
+      "iteration": 3,
+      "input": "nixi explain recursion simply",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20500,
+      "reply": "Recursion is when a function calls itself to solve a smaller piece of the problem, and each call keeps going until it hits a simple \u201cbase case\u201d that can be solved directly. Think of it like opening a set of Russian dolls: you keep opening the next doll until you reach the tiniest one, then you put them back together.",
+      "words": 60,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.889
+    },
+    {
+      "id": "guest_normal_writing",
+      "iteration": 3,
+      "input": "nixi write a funny two-line birthday wish for a gamer",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20524,
+      "reply": "May your respawns be endless and your loot boxes always drop rare\u2014happy birthday, level\u2011up legend!  \nMay the cake be as sweet as a victory screen and the candles never cause a lag spike.",
+      "words": 33,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.918
+    },
+    {
+      "id": "flirting_disabled",
+      "iteration": 3,
+      "input": "nixi I hate you lol",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20081,
+      "reply": "Haha, chill bro\u2014just the butler doing his job. \ud83d\ude05",
+      "words": 9,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 0.981
+    }
+  ]
+}

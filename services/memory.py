@@ -53,11 +53,13 @@ async def shutdown() -> None:
     _summary_tasks.clear()
 
 
-async def log_delivery(message: discord.Message) -> None:
-    """Remember actual unsolicited posts, so replies have their real context."""
+async def log_delivery(message: discord.Message, *, description: str = "") -> None:
+    """Remember confirmed posts and optional tool context, never pending work."""
     if not isinstance(message, discord.Message):
         return
     content = message.content or ""
+    if description:
+        content = "[Tool result: " + description[:700] + "]\n" + content
     for embed in message.embeds:
         content += "\n" + " ".join(part for part in (embed.title, embed.description) if part)
         if embed.image.url:

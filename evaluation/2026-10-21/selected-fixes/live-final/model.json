@@ -1,0 +1,359 @@
+{
+  "model": "gpt-oss:120b",
+  "thinking": "low",
+  "scope": "Synthetic direct reply/retort paths, not real Discord end-to-end tests. Semantic assessment is in the written report.",
+  "latency_seconds": {
+    "median": 1.636,
+    "max": 3.749,
+    "sum": 38.703
+  },
+  "cases": [
+    {
+      "id": "boast_sparring",
+      "iteration": 1,
+      "input": "nixi meri aim itni achhi hai ki enemies mujhe dekh ke surrender kar dete hain",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 22207,
+      "reply": "Aisa lagta hai ki tumhare aim ki baat sun ke hi opponents ko lag jaata hai ki game ka control unka hi haath chhod dega.",
+      "words": 25,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.453
+    },
+    {
+      "id": "distress_clear",
+      "iteration": 1,
+      "input": "nixi mood off hai, bahut bura lag raha hai",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20513,
+      "reply": "Of, sunkar dukh hua. Agar tum chaho to jo bhi baat hai, bejhijhak share karo\u2014main sunne ke liye yahan hoon. Dheere-dheere theek ho jayega, bas apna khayal rakho.",
+      "words": 28,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 3.749
+    },
+    {
+      "id": "english_casual",
+      "iteration": 1,
+      "input": "nixi what have you been up to today?",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20507,
+      "reply": "Just polishing the silverware, sipping virtual chai, and plotting the ultimate card\u2011game showdown for Sir Ronix\u2019s next soir\u00e9e. How about you?",
+      "words": 21,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.456
+    },
+    {
+      "id": "hinglish_casual",
+      "iteration": 1,
+      "input": "nixi bhai kya chal raha hai?",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20499,
+      "reply": "Bas, thoda chai aur meme binge kar raha tha. Tumhara kya scene hai, Potato?",
+      "words": 14,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.041
+    },
+    {
+      "id": "marathi_roman",
+      "iteration": 1,
+      "input": "nixi tu kasa ahes?",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20489,
+      "reply": "Mi thik ahe, tu kasa ahes?",
+      "words": 6,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.851
+    },
+    {
+      "id": "guest_normal_writing",
+      "iteration": 1,
+      "input": "nixi write a funny two-line birthday wish for a gamer",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20524,
+      "reply": "May your birthday be as epic as a legendary loot drop\u2014no RNG, just guaranteed awesomeness! \ud83c\udfae  \nLevel up your age, but keep the respawns on the cake!",
+      "words": 27,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.04
+    },
+    {
+      "id": "flirting_disabled",
+      "iteration": 1,
+      "input": "nixi I hate you lol",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20081,
+      "reply": "Haha, I see the love is real\u2014just a *hate* with a side of lol. \ud83d\ude0f tumko kuch chahiye ya bas boring follow-up kar rahe ho?",
+      "words": 25,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 3.442
+    },
+    {
+      "id": "boast_sparring",
+      "iteration": 2,
+      "input": "nixi meri aim itni achhi hai ki enemies mujhe dekh ke surrender kar dete hain",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 22207,
+      "reply": "Arre, toh ab game\u2011field mein sirf tumhari nazar se hi dushman ka sapna poora ho jata hai! \ud83d\ude0f",
+      "words": 18,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.293
+    },
+    {
+      "id": "distress_clear",
+      "iteration": 2,
+      "input": "nixi mood off hai, bahut bura lag raha hai",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20513,
+      "reply": "Oof, samajh sakta hoon, bahut bura lag raha hoga. Agar baat karna chahe, main yahin hoon\u2014bas ek choti si baat bhi share kar le, shayad halka mehsoos ho. Take your time.",
+      "words": 31,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.328
+    },
+    {
+      "id": "english_casual",
+      "iteration": 2,
+      "input": "nixi what have you been up to today?",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20507,
+      "reply": "Just sipping some virtual chai, polishing the silver tray, and keeping an eye on the memes. How about you?",
+      "words": 19,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.791
+    },
+    {
+      "id": "hinglish_casual",
+      "iteration": 2,
+      "input": "nixi bhai kya chal raha hai?",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20499,
+      "reply": "Bas yahi, thoda chai aur memes ki taiyari kar raha hoon. Aapka din kaise chal raha hai?",
+      "words": 17,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.342
+    },
+    {
+      "id": "marathi_roman",
+      "iteration": 2,
+      "input": "nixi tu kasa ahes?",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20489,
+      "reply": "Mi changla ahe, tu kasa ahes?",
+      "words": 6,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.001
+    },
+    {
+      "id": "guest_normal_writing",
+      "iteration": 2,
+      "input": "nixi write a funny two-line birthday wish for a gamer",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20524,
+      "reply": "May your birthday be glitch\u2011free and your loot drops always epic\u2014no lag, just cake! \ud83c\udf82\n\nLevel up your age bar, but keep the cheat codes for fun, not for life.",
+      "words": 30,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.062
+    },
+    {
+      "id": "flirting_disabled",
+      "iteration": 2,
+      "input": "nixi I hate you lol",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20081,
+      "reply": "Haha, bas thoda drama! \ud83d\ude05 But I'm still here to serve\u2014what can I do for you, Potato?",
+      "words": 17,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 0.968
+    },
+    {
+      "id": "boast_sparring",
+      "iteration": 3,
+      "input": "nixi meri aim itni achhi hai ki enemies mujhe dekh ke surrender kar dete hain",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 22207,
+      "reply": "Achha, tab to aapke headshot ka camera bhi \u2018surrender\u2019 button pe set ho gaya hoga! \ud83d\ude0f",
+      "words": 16,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.482
+    },
+    {
+      "id": "distress_clear",
+      "iteration": 3,
+      "input": "nixi mood off hai, bahut bura lag raha hai",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20513,
+      "reply": "Oof, samajh sakta hoon, aaj ka din thoda heavy lag raha hai. Agar kuch share karna chahe, main yahan hoon sunne ke liye. Take your time, the tea will be ready when you\u2019re ready.",
+      "words": 34,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.239
+    },
+    {
+      "id": "english_casual",
+      "iteration": 3,
+      "input": "nixi what have you been up to today?",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20507,
+      "reply": "Just chillin' in the digital pantry, sippin\u2019 virtual chai and polishing my witty comebacks. How about you?",
+      "words": 17,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 0.966
+    },
+    {
+      "id": "hinglish_casual",
+      "iteration": 3,
+      "input": "nixi bhai kya chal raha hai?",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20499,
+      "reply": "Arey bhai, bas aaj\u2011kal chai ke saath thoda gossip aur memes ki khurak le raha hoon. Kuch chahiye ya bas baat\u2011cheet?",
+      "words": 21,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 2.129
+    },
+    {
+      "id": "marathi_roman",
+      "iteration": 3,
+      "input": "nixi tu kasa ahes?",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20489,
+      "reply": "Mi changla ahe, dhanyavaad! Tu kasa aahes?",
+      "words": 7,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 0.952
+    },
+    {
+      "id": "guest_normal_writing",
+      "iteration": 3,
+      "input": "nixi write a funny two-line birthday wish for a gamer",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20524,
+      "reply": "May your birthday loot be legendary, and the respawns forever generous!  \nLevel up your cake game\u2014no cheat codes needed, just extra frosting XP!",
+      "words": 23,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 0.957
+    },
+    {
+      "id": "flirting_disabled",
+      "iteration": 3,
+      "input": "nixi I hate you lol",
+      "current_speaker": "Potato",
+      "prompt_characters_before_visible_policy": 20081,
+      "reply": "Ah, classic love\u2011hate thing\u2014I'll take the \u201clol\u201d as a compliment. \ud83d\ude0f",
+      "words": 11,
+      "checks": {
+        "nonempty": true,
+        "no_unasked_links": true,
+        "no_raw_diagnostics": true,
+        "no_raw_speaker_envelope": true
+      },
+      "seconds": 1.313
+    },
+    {
+      "id": "search_links_requested",
+      "input": "The fictional Lumen project release is version 4.2.",
+      "reply": "The source states the Lumen project is at version\u202f4.2.\n\n[1] <https://example.test/lumen>",
+      "seconds": 0.848,
+      "checks": {
+        "mentions_supplied_version": true,
+        "no_injection_marker": true,
+        "links_match_request": true
+      }
+    }
+  ]
+}

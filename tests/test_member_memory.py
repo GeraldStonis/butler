@@ -98,7 +98,7 @@ class MemberMemoryTests(unittest.IsolatedAsyncioTestCase):
 
     def test_natural_requests_and_explanatory_question(self):
         self.assertIsNone(intent.heuristic_intent("nixi reset your recent memory"))
-        self.assertIsNone(intent.heuristic_intent("how do I reset recent memory?"))
+        self.assertEqual(intent.heuristic_intent("how do I reset recent memory?").name, 'chat')
         target = SimpleNamespace(id=config.OWNER_ID + 1, bot=False)
         self.assertIsNone(intent.heuristic_intent("nixi remember <@123> likes chess", [target]))
         self.assertIsNone(intent.heuristic_intent("nixi what do you remember about <@123>", [target]))

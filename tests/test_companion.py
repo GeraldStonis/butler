@@ -92,7 +92,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_explanations_and_game_discussions_are_not_errands(self):
         self.assertEqual(social.guest_kind_hint('nixi explain recursion'), 'question')
-        self.assertIsNone(intent.heuristic_intent('nixi how does higher or lower work?'))
+        self.assertEqual(intent.heuristic_intent('nixi how does higher or lower work?').name, 'chat')
 
     async def test_followups_are_same_person_short_window_and_bounded(self):
         bot = SimpleNamespace(user=SimpleNamespace(id=99))

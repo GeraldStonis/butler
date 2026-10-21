@@ -29,6 +29,19 @@ def load_songs() -> list[dict]:
             video_id = str(song.get("youtubeId", ""))
             if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
                 unique[video_id] = {**song, "youtubeId": video_id}
+        tags_path = path.with_name("song_tags.json")
+        if tags_path.exists():
+            try:
+                tags = json.loads(tags_path.read_text(encoding="utf-8"))
+                if isinstance(tags, dict):
+                    for video_id, metadata in tags.items():
+                        if video_id in unique and isinstance(metadata, dict):
+                            for field in ("moods", "languages"):
+                                values = metadata.get(field)
+                                if field not in unique[video_id] and isinstance(values, list):
+                                    unique[video_id][field] = [v for v in values if isinstance(v, str)]
+            except (OSError, ValueError):
+                log.warning("Unable to read playlist tags from %s", tags_path)
         return list(unique.values())
     except (OSError, ValueError):
         log.warning("Unable to read valid playlist from %s", path)
@@ -41,15 +54,48 @@ def _normalized(text: str) -> str:
     return " ".join(re.findall(r"[^\W_]+", text.replace("'", "").replace("\u2019", "")))
 
 
+TAG_ALIASES = {
+    "sad": "sad", "melancholy": "sad", "heartbreak": "sad", "udaas": "sad",
+    "party": "party", "dance": "party", "dancing": "party",
+    "happy": "happy", "cheerful": "happy", "uplifting": "happy",
+    "chill": "chill", "calm": "chill", "relaxing": "chill", "relaxed": "chill",
+    "romantic": "romantic", "romance": "romantic",
+    **{language: language for language in ("english", "hindi", "assamese", "marathi", "punjabi", "bhojpuri", "bengali", "tamil", "telugu")},
+}
+
+
+def _matching_songs(songs: list[dict], query: str) -> tuple[list[dict], bool]:
+    exact = [s for s in songs if _normalized(str(s.get("title", ""))) == query]
+    if exact:
+        return exact, True
+    terms = set(query.split()) - {"by", "a", "some", "song", "songs", "music", "track", "tracks", "in", "please"}
+    tags = {TAG_ALIASES[t] for t in terms if t in TAG_ALIASES}
+    words = terms - TAG_ALIASES.keys()
+    matches = []
+    for song in songs:
+        metadata = []
+        for field in ("moods", "languages"):
+            values = song.get(field, [])
+            if isinstance(values, list):
+                metadata.extend(v for v in values if isinstance(v, str))
+        # Existing explicit categories still work. Titles never imply musical mood.
+        metadata.append(str(song.get("category", "")))
+        known_tags = {TAG_ALIASES.get(t, t) for value in metadata for t in _normalized(value).split()}
+        searchable = set(_normalized(" ".join(str(song.get(field, "")) for field in ("title", "artist", "category"))).split())
+        if terms and tags <= known_tags and words <= searchable:
+            matches.append(song)
+    explicit_track = any(title_terms and title_terms <= terms for s in matches
+                         if (title_terms := set(_normalized(str(s.get("title", ""))).split())))
+    return matches, explicit_track
+
+
 async def select_song(channel_id: int, query: str = "") -> dict | None:
     """Pick a real playlist entry, sharing persistent history with idle drops."""
     songs = load_songs()
     query = _normalized(query)
+    exact_track = False
     if query:
-        exact = [s for s in songs if _normalized(str(s.get("title", ""))) == query]
-        terms = set(query.split()) - {"by"}
-        songs = exact or [s for s in songs if terms and terms <= set(_normalized(
-            " ".join(str(s.get(field, "")) for field in ("title", "artist", "category"))).split())]
+        songs, exact_track = _matching_songs(songs, query)
     if not songs:
         return None
     async with _selection_lock:
@@ -64,7 +110,7 @@ async def select_song(channel_id: int, query: str = "") -> dict | None:
         if not candidates:
             candidates = [s for s in songs if not recent or s["youtubeId"] != recent[-1]]
         # Honor a specifically requested track even if it was just played.
-        if not candidates and query:
+        if not candidates and exact_track:
             candidates = songs
         if not candidates:
             return None

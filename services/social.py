@@ -28,21 +28,34 @@ def contains_baby_talk(text: str) -> bool:
 
 def preference_updates(content: str) -> dict[str, bool]:
     """A member can set their own comfort boundaries, not anyone else's."""
-    text = normalized_text(content).replace("don't", "do not")
+    text = normalized_text(content).replace("\u2019", "'").replace("don't", "do not")
+    text = re.sub(r"<@!?\d+>|\b(?:nixi|nixon|butler)\b", "", text).strip(" ,:!.?\n")
+    text = re.sub(r"^(?:(?:hey|yo|please|pls)[\s,:]+)+|(?:[, ]+(?:please|pls))+$", "", text).strip()
     updates = {}
     for key, pattern in {
         "roasting": r"\b(?:stop|do not|dont|no more)\s+(?:roast(?:ing)?|teas(?:e|ing)|mock(?:ing)?|bully(?:ing)?|making fun of)\s+me\b",
-        "pings": r"\b(?:stop|do not|dont)\s+(?:ping(?:ing)?|mention(?:ing)?)\s+me\b",
+        "pings": r"(?:stop|do not|dont|never)\s+(?:ping(?:ing)?|mention(?:ing)?|tag(?:ging)?)\s+me",
         "media": r"\b(?:(?:no|stop|do not send|dont send)\s+(?:more\s+)?(?:gifs?|memes?|media)(?:\s+(?:for|to)\s+me)?|(?:do not|dont)\s+send\s+me\s+(?:gifs?|memes?|media))\b",
     }.items():
-        if re.search(pattern, text):
+        if re.fullmatch(pattern, text):
             updates[key] = False
     for key, pattern in {
         "roasting": r"\b(?:you can|it'?s okay to)\s+(?:roast|tease)\s+me\s+again\b",
-        "pings": r"\b(?:you can|it'?s okay to)\s+ping\s+me\s+again\b",
+        "pings": r"\b(?:you can|it'?s okay to)\s+(?:ping|tag|mention)\s+me\s+again\b",
         "media": r"\b(?:gifs?|memes?|media)\s+(?:for|to)\s+me\s+(?:are\s+)?(?:okay|ok)\s+again\b",
     }.items():
-        if re.search(pattern, text):
+        if re.fullmatch(pattern, text):
+            updates[key] = True
+    self_words = r"(?:mujhe|mujhko|mereko|mere ko|mujh ko)"
+    stop = r"mat\s+kar(?:na|o)?|band\s+kar(?:na|o)?"
+    for key, verb, subject in (
+        ("pings", r"(?:ping|tag|mention)", self_words),
+        ("roasting", r"(?:roast|tease|mock|troll)", self_words),
+        ("flirting", r"flirt", rf"(?:{self_words}|(?:mere|mujh)\s+se)"),
+    ):
+        if re.fullmatch(rf"{subject}\s+(?:{verb}\s+(?:{stop})|mat\s+{verb}\s+kar(?:na|o)?)", text):
+            updates[key] = False
+        elif re.fullmatch(rf"{subject}\s+(?:phir se|wapas)\s+{verb}\s+kar\s+sakte\s+ho", text):
             updates[key] = True
     # Member overrides are literal self-directed statements, never model inferences.
     avatar_text = re.sub(r"<@!?\d+>|\b(?:nixi|nixon|butler)\b", "", text).strip(" ,:!.")

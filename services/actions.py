@@ -27,6 +27,14 @@ def _media_embed(result: media.MediaResult) -> discord.Embed:
     return embed
 
 
+async def _remember_result(sent: discord.Message, description: str) -> None:
+    # Discord already accepted the reply. A DB error must not trigger a second reply.
+    try:
+        await memory.log_delivery(sent, description=description)
+    except Exception as exc:
+        log.warning("Delivered tool result could not be remembered (%s)", type(exc).__name__)
+
+
 async def reply_discreetly(message: discord.Message, kind: str, reason: str) -> None:
     log.info("Continuing %s as conversation (%s)", kind, reason)
     text = await conversation.discreet_reply(message.content, is_owner=message.author.id == config.OWNER_ID)
@@ -159,7 +167,9 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
         if name == "cat":
             result = await media.fetch_cat()
             if result:
-                await message.reply(embed=_media_embed(result), mention_author=False)
+                sent = await message.reply(embed=_media_embed(result), mention_author=False,
+                                           allowed_mentions=discord.AllowedMentions.none())
+                await _remember_result(sent, f"Cat image delivered: {result.title}; source: {result.url}")
             else:
                 await reply_discreetly(message, name, "no_image")
             return True
@@ -170,7 +180,9 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             text = await search.summarize_results(query, results, include_links=requests_links(message.content),
                                                   language_request=message.content)
             if text:
-                await message.reply(text, mention_author=False)
+                sent = await message.reply(text, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
+                sources = ', '.join(item.url for item in results[:3])
+                await _remember_result(sent, f"Web search answered: {query}; sources: {sources}")
             else:
                 await reply_discreetly(message, name, "no_verified_results")
             return True
@@ -179,7 +191,8 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             text = await build_news_briefing(owner_intent.query or None, include_links=requests_links(message.content),
                                              language_request=message.content)
             if text:
-                await message.reply(text, mention_author=False)
+                sent = await message.reply(text, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
+                await _remember_result(sent, f"News briefing delivered: {owner_intent.query or ', '.join(config.MORNING_NEWS_TOPICS)}")
             else:
                 await reply_discreetly(message, name, "no_verified_results")
             return True
@@ -190,7 +203,9 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             if not result:
                 await reply_discreetly(message, name, "no_image")
                 return True
-            await message.reply(embed=_media_embed(result), mention_author=False)
+            sent = await message.reply(embed=_media_embed(result), mention_author=False,
+                                       allowed_mentions=discord.AllowedMentions.none())
+            await _remember_result(sent, f"Image delivered for {query}: {result.title}; source: {result.url}")
             return True
 
         if name == "gif_search":
@@ -199,7 +214,9 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             if not result:
                 await reply_discreetly(message, name, "no_gif")
                 return True
-            await message.reply(embed=_media_embed(result), mention_author=False)
+            sent = await message.reply(embed=_media_embed(result), mention_author=False,
+                                       allowed_mentions=discord.AllowedMentions.none())
+            await _remember_result(sent, f"GIF delivered for {query}: {result.title}; source: {result.url}")
             return True
 
         if name in {"meme", "captioned_gif"}:
@@ -232,8 +249,9 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             if not result:
                 await reply_discreetly(message, name, "no_gif")
                 return True
-            label = "Tea service" if name == "tea" else "Coffee service"
-            await message.reply(f"{label}, as requested.", embed=_media_embed(result), mention_author=False)
+            sent = await message.reply(embed=_media_embed(result), mention_author=False,
+                                       allowed_mentions=discord.AllowedMentions.none())
+            await _remember_result(sent, f"{name.title()} serving GIF delivered: {result.title}; source: {result.url}")
             return True
 
         if name == "action_gif":

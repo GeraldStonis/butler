@@ -412,7 +412,7 @@ class AvatarPreferenceAndIntentTests(unittest.TestCase):
             self.assertEqual(request.name, 'avatar_edit')
             self.assertEqual(request.action, scene)
             self.assertEqual(request.target_user_id, target.id)
-        self.assertIsNone(intent.heuristic_intent('nixi how do I edit an avatar?'))
+        self.assertEqual(intent.heuristic_intent('nixi how do I edit an avatar?').name, 'chat')
 
     def test_requested_wording_and_other_custom_scenes(self):
         target = SimpleNamespace(id=config.OWNER_ID + 1, bot=False)

@@ -47,6 +47,42 @@ def _strip_bot_name(text: str) -> str:
     return re.sub(r"\b(nixi|nixon|butler)\b[:,]?\s*", "", text, flags=re.IGNORECASE).strip()
 
 
+def _actionable_text(text: str) -> str | None:
+    """Keep clear positive requests; questions and quoted/negated orders are chat."""
+    cleaned = _strip_bot_name(text.replace("\u2019", "'"))
+    cleaned = re.sub(r"^<@!?\d+>\s*", "", cleaned).strip()
+    if conversation.requests_verbatim_text(cleaned) or cleaned.startswith(('"', "'", '`', '>')):
+        return None
+    prefix = r"^(?:(?:hey|yo|please|pls)[\s,:]+)*(?:(?:can|could|would|will)\s+you\s+)?"
+    if re.match(prefix + r"(?:explain|define|describe|tell me (?:how|why|what))\b", cleaned, re.I):
+        return None
+    if re.match(r"^(?:(?:hey|please)\s+)*(?:how|why|what (?:does|is (?:a|an|the meaning of)))\b", cleaned, re.I):
+        return None
+    if (re.match(r"^what\s+(?:is|are)\b", cleaned, re.I)
+            and re.search(r"\b(?:brew|brewing|memes?|gifs?|avatars?|trivia|quiz)\b", cleaned, re.I)
+            and not re.search(r"\b(?:latest|today|current|new)\b", cleaned, re.I)):
+        return None
+    negative = re.search(
+        r"\b(?:don't|dont|do not|never|stop|avoid)\s+(?:(?:you|please|ever)\s+)*"
+        r"(?:send(?:ing)?|serv(?:e|ing)|play(?:ing)?|start(?:ing)?|find(?:ing)?|fetch(?:ing)?|"
+        r"post(?:ing)?|shar(?:e|ing)|giv(?:e|ing)|get(?:ting)?|show(?:ing)?|"
+        r"brew(?:ing)?|bring(?:ing)?|pour(?:ing)?|search(?:ing)?|hug(?:ging)?|punch(?:ing)?|"
+        r"kiss(?:ing)?|edit(?:ting)?|generat(?:e|ing)|make|making|ping(?:ing)?|tag(?:ging)?)\b"
+        r"|\b(?:can|could|would|will)\s+you\s+(?:not|never)\b|\bmat\s+(?:kar\w*|bhej\w*|do|dena)\b",
+        cleaned, re.I,
+    )
+    if not negative:
+        return cleaned
+    # A clear replacement clause is the only fast path for mixed negation.
+    # Ignore earlier mentions as well as earlier keywords when selecting it.
+    clauses = re.split(r"\s*(?:[,;]|\bbut\b|\binstead\b)\s*", cleaned, flags=re.I)
+    if len(clauses) > 1 and negative.start() < len(clauses[0]):
+        replacement = clauses[-1].strip(" .!?") or clauses[-2].strip(" .!?")
+        if re.match(prefix + r"(?:send|serve|play|fetch|find|show|bring|give|share|start|search)\b", replacement, re.I):
+            return _actionable_text(replacement)
+    return None
+
+
 def _first_mention_id(mentions: list, *, include_owner: bool = False) -> int | None:
     for user in mentions:
         if (include_owner or getattr(user, "id", None) != config.OWNER_ID) and not getattr(user, "bot", False):
@@ -137,14 +173,18 @@ def _song_request(text: str) -> OwnerIntent | None:
 def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | None:
     """Catch common requests without spending an LLM call."""
     mentions = mentions or []
-    cleaned = _strip_bot_name(text)
+    cleaned = _actionable_text(text)
+    if cleaned is None:
+        return OwnerIntent("chat")
+    if cleaned != _strip_bot_name(text.replace("\u2019", "'")):
+        mentions = [user for user in mentions if re.search(rf"<@!?{user.id}>", cleaned)]
     lower = cleaned.lower()
     if conversation.requests_verbatim_text(cleaned) or re.search(
         r"\b(?:your (?:gender|pronouns?)|(?:pick|choose)\s+(?:(?:a|your|one)\s+)?gender)\b"
         r"|\b(?:call|address)\b.{0,100}\bmaster\b", lower,
     ):
         return OwnerIntent("chat")
-    ping = ping_request(text, mentions)
+    ping = ping_request(cleaned, mentions)
     if ping:
         return ping
     song_request = _song_request(cleaned)
@@ -244,6 +284,12 @@ async def classify_owner_intent(text: str, mentions: list | None = None) -> Owne
     if heuristic:
         return heuristic
 
+    actionable = _actionable_text(text)
+    if actionable is None:
+        return OwnerIntent("chat")
+    if actionable != _strip_bot_name(text.replace("\u2019", "'")):
+        mentions = [user for user in mentions if re.search(rf"<@!?{user.id}>", actionable)]
+
     prompt = [
         {
             "role": "system",
@@ -284,7 +330,7 @@ async def classify_owner_intent(text: str, mentions: list | None = None) -> Owne
                 "lookup requests. Use news for news/headline requests."
             ),
         },
-        {"role": "user", "content": text},
+        {"role": "user", "content": actionable},
     ]
     raw = await llm.generate_response(prompt, temperature=0.1, max_tokens=160)
     try:
@@ -307,7 +353,8 @@ async def classify_owner_intent(text: str, mentions: list | None = None) -> Owne
             action = _reaction_action(action.lower()) or action.lower()
     return OwnerIntent(
         name=name,
-        query=text if name in {"avatar_edit", "captioned_gif"} else str(data.get("query", "")).strip(),
+        query=(text if actionable == _strip_bot_name(text.replace("\u2019", "'")) else actionable)
+              if name in {"avatar_edit", "captioned_gif"} else str(data.get("query", "")).strip(),
         action=action,
         target_user_id=(_first_mention_id(mentions, include_owner=name == "action_gif")
                         if name in {"avatar_edit", "action_gif"} else None),
