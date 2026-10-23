@@ -25,6 +25,14 @@ The key design rule is simple:
 ## Current Features
 
 - Natural conversation when mentioned, replied to, or DM'd.
+- Every conversational reply stays attached to its requesting message. Recognizable
+  wrong-member greetings/direct addresses get one recipient-correction generation
+  before delivery, not a blind name swap that could attach another person's facts.
+  A repeated bad draft is replaced by a small reaction. Quoted speech, requested
+  writing and ordinary third-person references are preserved. Ambiguous `@name`
+  aliases prefer the current sender only when that sender actually owns the alias;
+  other ambiguous aliases are not guessed. This is a conservative name/mention
+  guard, not a semantic guarantee that every generated fact belongs to the right person.
 - Nixi's character is male (he/him). Verified Ronix's harmless requests take
   priority over reflexive AI disclaimers: choices, exact wording and temporary
   performances should receive a direct response. A one-reply honorary "Master"
@@ -472,8 +480,8 @@ MORNING_NEWS_TOPICS=world,india,technology,cybersecurity
 DEAD_CHAT_ENABLED=false
 DEAD_CHAT_IDLE_SECONDS=60
 DEAD_CHAT_CHANNEL_IDS=
-DEAD_CHAT_PREFERRED_USER_ID=0
-DEAD_CHAT_PREFERRED_CHANCE=0.8
+DEAD_CHAT_PREFERRED_USER_ID=1423982225938190346
+DEAD_CHAT_PREFERRED_CHANCE=1.0
 
 STICKER_SPAM_ENABLED=false
 STICKER_SPAM_CHANNEL_ID=
@@ -482,8 +490,10 @@ STICKER_SPAM_INTERVAL_SECONDS=60
 
 Dead-chat waits start at `DEAD_CHAT_IDLE_SECONDS`, then double after each
 unanswered nudge (1, 2, 4 minutes by default, and so on). Each wait is measured from
-the latest channel message. Any human message resets the sequence. Bot messages
-do not reset it. State survives restarts; the old fixed cooldown setting is ignored.
+the last human message for the first nudge, and from Nixi's previous dead-chat
+nudge thereafter. Stickers, memes, replies and other bots no longer postpone
+this clock. Any human message resets the sequence. State survives restarts;
+the old fixed cooldown setting is ignored.
 At most five unanswered nudges are sent (1, 2, 4, 8, 16 minute waits at the
 default setting), then nudging stops until a human speaks. Nudge wording and
 protected-request refusals are generated afresh by the LLM, using stored lines only
@@ -510,10 +520,13 @@ Dead-chat revival uses the original roast-and-ping behavior: a freshly generated
 roast plus one random non-bot member's mention, excluding Ronix and members who
 opted out of pings or teasing. Set `DEAD_CHAT_PREFERRED_USER_ID` to a member who
 has asked for sharper roasts to favor that member; `0` disables preference.
-With the preferred member eligible, `DEAD_CHAT_PREFERRED_CHANCE=0.8` gives them
-an 80% priority roll. After two consecutive successful pings to that member, Nixi
-rotates to someone else when possible; therefore 80% is not a guaranteed share of
-all pings. Rotation history survives restarts and advances only after delivery.
+The requested target defaults to `1423982225938190346`, including when the ID
+variable is absent or blank. Set an explicit `0` to disable priority. With the
+preferred member eligible, `DEAD_CHAT_PREFERRED_CHANCE=1.0` always selects them
+until two consecutive successful pings; Nixi then rotates to someone else when
+possible. This favors that member without pinging only them. Lower values, such
+as `0.8`, restore a probability roll. Rotation history survives restarts and
+advances only after delivery.
 If the member is absent, a bot, Ronix, or has opted out, normal selection applies.
 Other members keep the normal playful tone; the preferred target gets a freshly
 generated cutting roast of their lurking or Discord theatrics, without slurs,
@@ -524,12 +537,20 @@ when possible; a single eligible member can still be selected. With no eligible
 member, no nudge is sent.
 Games and conversation openers never replace these nudges. Old
 `AUTOMATIC_GAME_CHANCE` and `ENGAGEMENT_TOPIC_CHANCE` variables are ignored.
-Unsolicited memes, music, and nudges share a channel cooldown. Memes and music
-retain `AUTONOMOUS_MIN_GAP_SECONDS` (two minutes by default); dead-chat nudges use
-the smaller of that setting and their base idle interval, so the shared cooldown
-does not silently turn a one-minute nudge into a two-minute wait. Quiet hours and
+Memes and music retain the shared `AUTONOMOUS_MIN_GAP_SECONDS` cooldown (two
+minutes by default). Dead-chat nudges use their own one-minute/doubling clock,
+so other scheduled posts cannot continually postpone them. A delivered nudge
+still delays the next unsolicited meme/music post. Quiet hours and
 the five-ping/backoff limits still apply. Provider failures
 back off instead of repeatedly generating a nudge every 15 seconds.
+
+On Railway, set `DEAD_CHAT_ENABLED=true`, `DEAD_CHAT_IDLE_SECONDS=60`,
+`DEAD_CHAT_PREFERRED_USER_ID=1423982225938190346`, and
+`DEAD_CHAT_PREFERRED_CHANCE=1.0`, keeping your existing `DEAD_CHAT_CHANNEL_IDS`.
+Existing Railway variables override defaults; editing local `.env` does not
+update Railway. The worker logs its effective dead-chat settings after connecting.
+The scheduler checks about every 15 seconds; model/network time adds to delivery
+latency. The 24-hour deletion, overnight silence and five-ping cap still apply.
 
 Optional `QUIET_HOURS=23:00-08:00` uses `SERVER_TIMEZONE` (default Asia/Kolkata)
 and suppresses routine unsolicited posts, including sticker spam. Owner requests

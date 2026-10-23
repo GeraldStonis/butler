@@ -55,6 +55,14 @@ DEAD_CHAT_EXAMPLES = (
     "ded chat. {member}, I see the online dot. Now show us the alleged personality. Start a topic.",
 )
 
+SAVAGE_DEAD_CHAT_EXAMPLES = (
+    "ded chat. Your contribution has the loading speed of a government website. Drop one take worth the wait.",
+    "ded chat. All that main-character energy and your dialogue budget is zero. Give us a plot twist.",
+    "ded chat. Even your typing indicator has retired from carrying this performance. Defend your worst gaming take.",
+    "ded chat. You supervise silence like it pays rent. Clock out and say which film you would delete from history.",
+    "ded chat. Your comeback folder has more empty space than this channel. Prove me wrong with one hot take.",
+)
+
 
 def dead_chat_delay_seconds(row: dict) -> int:
     count = max(0, int(row.get("dead_ping_count") or 0)) if row.get("last_message_is_bot") else 0
@@ -62,15 +70,22 @@ def dead_chat_delay_seconds(row: dict) -> int:
 
 
 def dead_chat_due(row: dict) -> bool:
-    return (int(row.get("dead_ping_count") or 0) < 5
-            and float(row.get("idle_seconds") or 0) >= dead_chat_delay_seconds(row))
+    count = int(row.get("dead_ping_count") or 0)
+    # Stickers, memes and other bots are not conversation. Only humans reset the
+    # campaign; subsequent delays start at our own previous dead-chat nudge.
+    elapsed = row.get("cooldown_seconds") if count else row.get("human_idle_seconds")
+    if elapsed is None:
+        elapsed = row.get("idle_seconds")
+    return count < 5 and float(elapsed or 0) >= dead_chat_delay_seconds(row)
 
 
 async def generate_dead_chat_line(previous: str | None, count: int, *, savage: bool = False) -> str:
     intensity = (
         "The owner reports this chosen member ASKED for savage playful roasting. "
         "Deliver a sharp, confident, cutting roast of their lurking, weak comebacks or "
-        "Discord theatrics, then bait one funny contribution to revive chat. Be more biting "
+        "Discord theatrics, then bait one funny contribution to revive chat with an answerable "
+        "question or challenge. Use one concrete, humiliatingly funny comparison about their "
+        "chat performance, not a generic 'where is everyone' or a polite request to speak. Be more biting "
         "than a polite tease: original comparisons and dry contempt for the performance, "
         "not the person's worth. No apologies, disclaimers, generic service offers or "
         "calls for others to pile on. Keep it clearly comic, never hateful or threatening. "
@@ -78,6 +93,7 @@ async def generate_dead_chat_line(previous: str | None, count: int, *, savage: b
         "life, and do not invent biographical facts. "
         if savage else ""
     )
+    examples = SAVAGE_DEAD_CHAT_EXAMPLES if savage else DEAD_CHAT_EXAMPLES
     for _ in range(2):
         text = await llm.generate_visible_response([
             {"role": "system", "content": config.load_persona()},
@@ -88,15 +104,15 @@ async def generate_dead_chat_line(previous: str | None, count: int, *, savage: b
                 "Do not include names, mentions, URLs, or placeholders; the application adds "
                 "one chosen member's mention. " + intensity
                 + "These are ONLY style examples, never copy them:\n"
-                + "\n".join(line.replace('{member}, ', '') for line in random.sample(DEAD_CHAT_EXAMPLES, 3))
+                + "\n".join(line.replace('{member}, ', '') for line in random.sample(examples, 3))
                 + "\nDo not repeat the previous nudge. Output only the new message."
             )},
             {"role": "user", "content": json.dumps({"previous_nudge": previous, "nudge_number": count + 1})},
         ], temperature=0.95, max_tokens=600, failure_reply="", language_request="")
         text = filter_links(text)
         text = re.sub(r"<@[^>]*>|@(?:everyone|here)|\{member\}", "", text).strip()
-        examples = {line.replace('{member}, ', '').casefold() for line in DEAD_CHAT_EXAMPLES}
-        if text and len(text) <= 500 and text.casefold() != (previous or '').casefold() and text.casefold() not in examples:
+        example_texts = {line.replace('{member}, ', '').casefold() for line in (*DEAD_CHAT_EXAMPLES, *SAVAGE_DEAD_CHAT_EXAMPLES)}
+        if text and len(text) <= 500 and text.casefold() != (previous or '').casefold() and text.casefold() not in example_texts:
             return text
     return ""
 
@@ -128,6 +144,12 @@ class HousekeepingCog(commands.Cog):
     @housekeeping_loop.before_loop
     async def before_housekeeping(self) -> None:
         await self.bot.wait_until_ready()
+        log.info("Dead-chat settings: enabled=%s channels=%s base=%ds preferred_user=%d chance=%.2f quiet=%s timezone=%s cap=5",
+                 config.DEAD_CHAT_ENABLED, config.DEAD_CHAT_CHANNEL_IDS, config.DEAD_CHAT_IDLE_SECONDS,
+                 config.DEAD_CHAT_PREFERRED_USER_ID, config.DEAD_CHAT_PREFERRED_CHANCE,
+                 config.DEAD_CHAT_QUIET_HOURS or "off", config.SERVER_TIMEZONE)
+        if config.DEAD_CHAT_ENABLED and not config.DEAD_CHAT_PREFERRED_USER_ID:
+            log.warning("Preferred dead-chat targeting is disabled: DEAD_CHAT_PREFERRED_USER_ID=0")
 
     @tasks.loop(seconds=60)
     async def sticker_spam_loop(self) -> None:
@@ -200,7 +222,6 @@ class HousekeepingCog(commands.Cog):
     async def _maybe_nudge_dead_chat(self) -> None:
         if not config.DEAD_CHAT_ENABLED or engagement.dead_chat_quiet_now():
             return
-        gap = min(config.AUTONOMOUS_MIN_GAP_SECONDS, max(1, config.DEAD_CHAT_IDLE_SECONDS))
 
         candidates = await db.get_channel_idle_candidates(config.DEAD_CHAT_CHANNEL_IDS or None)
         for row in candidates:
@@ -212,7 +233,7 @@ class HousekeepingCog(commands.Cog):
                 continue
             if config.DEAD_CHAT_CHANNEL_IDS and channel.id not in config.DEAD_CHAT_CHANNEL_IDS:
                 continue
-            if not row.get("last_user_id") or not await engagement.can_post(channel.id, min_gap_seconds=gap):
+            if not row.get("last_user_id") or not await engagement.can_post(channel.id, min_gap_seconds=0):
                 continue
             retry_key = f"engagement_retry:{channel.id}"
             try:
@@ -240,10 +261,12 @@ class HousekeepingCog(commands.Cog):
                                                      savage=member.id == config.DEAD_CHAT_PREFERRED_USER_ID)
                 if not line:
                     continue
+                # This backoff is for failed generation, not a later human interruption.
+                await db.set_state(retry_key, "0")
                 latest = await db.get_channel_idle_candidates([channel.id])
                 if not latest or latest[0]["last_message_at"] != fresh[0]["last_message_at"]:
                     continue
-                if engagement.dead_chat_quiet_now() or not await engagement.can_post(channel.id, min_gap_seconds=gap):
+                if engagement.dead_chat_quiet_now() or not await engagement.can_post(channel.id, min_gap_seconds=0):
                     continue
                 # A member can revoke permission while the model is generating.
                 if member.id in await db.get_dead_chat_opt_outs(channel.guild.id):
@@ -256,7 +279,6 @@ class HousekeepingCog(commands.Cog):
                     channel.id, sent.id, sent.created_at.timestamp() + DEAD_CHAT_MESSAGE_TTL_SECONDS)
                 await db.mark_dead_chat_ping(channel.id)
                 await db.set_state(line_key, line)
-                await db.set_state(retry_key, "0")
                 await memory.log_delivery(sent)
                 await engagement.mark_sent(channel.id)
                 await self._record_dead_chat_target(channel.id, member.id)

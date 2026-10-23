@@ -58,7 +58,7 @@ class DeadChatCleanupTests(unittest.IsolatedAsyncioTestCase):
     async def test_real_nudge_path_schedules_exactly_one_day_after_creation(self):
         await db.record_user_activity(1, 10, 20, 'Guest')
         connection = await db.get_db()
-        await connection.execute("UPDATE channel_activity SET last_channel_message_at=datetime('now', '-301 seconds') WHERE channel_id=10")
+        await connection.execute("UPDATE channel_activity SET last_message_at=datetime('now', '-301 seconds') WHERE channel_id=10")
         await connection.commit()
         created = datetime.fromtimestamp(self.now - 45, timezone.utc)
         channel = MagicMock(spec=discord.TextChannel)

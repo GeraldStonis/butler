@@ -42,7 +42,7 @@ class PreferredDeadChatTests(unittest.IsolatedAsyncioTestCase):
     async def ready(self):
         await db.record_user_activity(1, 10, 21, 'Guest')
         connection = await db.get_db()
-        await connection.execute("UPDATE channel_activity SET last_channel_message_at=datetime('now', '-61 seconds') WHERE channel_id=10")
+        await connection.execute("UPDATE channel_activity SET last_message_at=datetime('now', '-61 seconds') WHERE channel_id=10")
         await connection.commit()
 
     async def test_preferred_member_can_be_selected_again(self):

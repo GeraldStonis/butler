@@ -53,7 +53,8 @@ def _get_guild_emoji_ids(guild: discord.Guild) -> set[int]:
     return {e.id for e in guild.emojis}
 
 
-async def filter_response(text: str, guild: discord.Guild | None, *, allow_links: bool = False) -> str:
+async def filter_response(text: str, guild: discord.Guild | None, *, allow_links: bool = False,
+                          current_author_id: int | None = None) -> str:
     """
     Post-process an LLM response.
 
@@ -63,13 +64,20 @@ async def filter_response(text: str, guild: discord.Guild | None, *, allow_links
     """
     text = filter_links(text, allow_links)
     if guild:
-        sorted_members = sorted(guild.members, key=lambda m: len(m.display_name), reverse=True)
-        for member in sorted_members:
-            pattern = re.compile(r"@" + re.escape(member.display_name) + r"(?!\w)", re.IGNORECASE)
-            text = pattern.sub(f"<@{member.id}>", text)
-            if member.name != member.display_name:
-                pattern2 = re.compile(r"@" + re.escape(member.name) + r"(?!\w)", re.IGNORECASE)
-                text = pattern2.sub(f"<@{member.id}>", text)
+        aliases = {}
+        for member in guild.members:
+            for name in (member.display_name, getattr(member, 'name', '')):
+                if name:
+                    aliases.setdefault(name.casefold(), set()).add(member.id)
+        if aliases:
+            pattern = re.compile(r"(?<![\w@<])@(" + "|".join(
+                re.escape(name) for name in sorted(aliases, key=len, reverse=True)) + r")(?!\w)", re.I)
+            def resolve_member(match):
+                ids = aliases[match[1].casefold()]
+                if current_author_id in ids:
+                    return f"<@{current_author_id}>"
+                return f"<@{next(iter(ids))}>" if len(ids) == 1 else match[0]
+            text = pattern.sub(resolve_member, text)
 
     if not guild or not guild.emojis:
         text = CUSTOM_EMOJI_RE.sub("", text)

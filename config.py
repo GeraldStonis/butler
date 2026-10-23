@@ -110,8 +110,8 @@ DEAD_CHAT_IDLE_SECONDS: int = int(os.environ.get("DEAD_CHAT_IDLE_SECONDS", "60")
 DEAD_CHAT_COOLDOWN_SECONDS: int = int(os.environ.get("DEAD_CHAT_COOLDOWN_SECONDS", "3600"))
 DEAD_CHAT_CHANNEL_IDS: list[int] = _int_list_env("DEAD_CHAT_CHANNEL_IDS")
 DEAD_CHAT_QUIET_HOURS: str = os.environ.get("DEAD_CHAT_QUIET_HOURS", "00:00-08:00").strip()
-DEAD_CHAT_PREFERRED_USER_ID: int = int(os.environ.get("DEAD_CHAT_PREFERRED_USER_ID") or "0")
-DEAD_CHAT_PREFERRED_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("DEAD_CHAT_PREFERRED_CHANCE", "0.8"))))
+DEAD_CHAT_PREFERRED_USER_ID: int = int(os.environ.get("DEAD_CHAT_PREFERRED_USER_ID") or "1423982225938190346")
+DEAD_CHAT_PREFERRED_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("DEAD_CHAT_PREFERRED_CHANCE") or "1.0")))
 
 # Sticker spam; disabling also stops scheduled memes in this channel.
 STICKER_SPAM_ENABLED: bool = _bool_env("STICKER_SPAM_ENABLED", False)

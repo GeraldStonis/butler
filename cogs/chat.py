@@ -18,7 +18,7 @@ from discord.ext import commands
 import config
 from services import actions, database as db, emoji_filter, intent, llm, memory
 from services.response_text import FALLBACK_REACTION, requests_links
-from services import social, conversation, avatar_edits, charm, opinions
+from services import social, conversation, avatar_edits, charm, opinions, reply_target
 
 log = logging.getLogger("nixi.chat")
 
@@ -235,6 +235,9 @@ class ChatCog(commands.Cog):
                 if not fixed_reply:
                     return
         if fixed_reply:
+            fixed_reply = await reply_target.ensure_reply(fixed_reply, message.author,
+                getattr(message.guild, "members", []), content,
+                [{"role": "user", "content": content}])
             avatar_image, pending_reaction = None, None
             if guest_kind == "protected":
                 avatar_image, _, pending_reaction = await self._quick_reaction(message, fixed_reply, avatar_only=True)
@@ -320,8 +323,10 @@ class ChatCog(commands.Cog):
                 )})
             reply_text = await conversation.generate_reply(context, message.channel.id, content,
                 nixi_author_id=self.bot.user.id, current_author_id=message.author.id)
+            reply_text = await reply_target.ensure_reply(reply_text, message.author,
+                getattr(message.guild, "members", []), content, context)
             reply_text = await emoji_filter.filter_response(
-                reply_text, message.guild, allow_links=requests_links(content)
+                reply_text, message.guild, allow_links=requests_links(content), current_author_id=message.author.id,
             )
             if message.author.id == config.OWNER_ID and not reply_text.strip():
                 reply_text = FALLBACK_REACTION

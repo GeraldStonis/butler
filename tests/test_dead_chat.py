@@ -85,7 +85,7 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
         cog.bot = SimpleNamespace(get_channel=lambda _: channel)
         cog._pick_random_member = AsyncMock(return_value=SimpleNamespace(id=20, mention='<@20>'))
         async def age(seconds):
-            await connection.execute("UPDATE channel_activity SET last_channel_message_at=datetime('now', ?) WHERE channel_id=10", (f'-{seconds} seconds',))
+            await connection.execute("UPDATE channel_activity SET last_message_at=datetime('now', ?), last_dead_ping_at=CASE WHEN dead_ping_count > 0 THEN datetime('now', ?) ELSE NULL END WHERE channel_id=10", (f'-{seconds} seconds', f'-{seconds} seconds'))
             await connection.commit()
         with patch('config.DEAD_CHAT_ENABLED', True), patch('config.DEAD_CHAT_CHANNEL_IDS', [10]), patch('cogs.housekeeping.generate_dead_chat_line', AsyncMock(side_effect=['ded chat. Your keyboard is on unpaid leave. Give it a topic.', 'ded chat. The silence has tenure. Challenge it.'])):
             await age(61)
@@ -128,7 +128,7 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
     async def test_dead_chat_uses_roast_ping_never_an_automatic_game(self):
         await db.record_user_activity(1, 10, 20, 'Sam')
         connection = await db.get_db()
-        await connection.execute("UPDATE channel_activity SET last_channel_message_at=datetime('now', '-61 seconds') WHERE channel_id=10")
+        await connection.execute("UPDATE channel_activity SET last_message_at=datetime('now', '-61 seconds') WHERE channel_id=10")
         await connection.commit()
         channel = MagicMock(spec=discord.TextChannel)
         channel.id = 10
@@ -172,7 +172,7 @@ class DeadChatTests(unittest.IsolatedAsyncioTestCase):
     async def test_generation_crossing_midnight_does_not_ping(self):
         await db.record_user_activity(1, 10, 20, 'Sam')
         connection = await db.get_db()
-        await connection.execute("UPDATE channel_activity SET last_channel_message_at=datetime('now', '-61 seconds') WHERE channel_id=10")
+        await connection.execute("UPDATE channel_activity SET last_message_at=datetime('now', '-61 seconds') WHERE channel_id=10")
         await connection.commit()
         channel = MagicMock(spec=discord.TextChannel)
         channel.id = 10
