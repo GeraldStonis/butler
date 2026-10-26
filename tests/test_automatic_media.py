@@ -75,13 +75,12 @@ class AutomaticMediaTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_valid_visual_punchline_can_be_delivered(self):
         self.assertIs(await self.service.choose(10, self.content, self.reply), self.result)
-        self.gif.assert_awaited_once_with('detective empty folder', allow_reuse=False)
+        self.gif.assert_awaited_once_with('detective empty folder', allow_reuse=True)
         self.assertFalse(self.result.standalone)
         instructions = self.model.await_args.args[0][0]['content']
-        self.assertIn('Text alone is the default', instructions)
-        self.assertIn('MOST exchanges', instructions)
-        self.assertIn('not a reason to attach media', instructions)
-        self.assertNotIn('Prefer a fitting GIF', instructions)
+        self.assertIn('Prefer a fitting GIF', instructions)
+        self.assertIn('does not need to invent a separate elaborate joke', instructions)
+        self.assertIn('Always keep the existing text reply', instructions)
 
     async def test_selector_can_decline_media_even_when_sampled(self):
         self.model.return_value = '{"kind":"none","adds_punchline":false}'

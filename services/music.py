@@ -151,7 +151,11 @@ async def select_song(channel_id: int, query: str = "") -> dict | None:
     """Pick a real playlist entry, sharing persistent history with idle drops."""
     songs = load_songs()
     query = _normalized(query)
-    if query:
+    if query in {'it', 'that', 'that one', 'it again', 'that again', 'the same song',
+                 'that song again', 'the last song', 'last song again', 'same song again', 'again'}:
+        last_id = await db.get_state(f'music_last_delivered:{channel_id}')
+        songs = [s for s in songs if s['youtubeId'] == last_id]
+    elif query:
         songs, _ = _matching_songs(songs, query)
     if not songs:
         return None
@@ -174,6 +178,14 @@ async def select_song(channel_id: int, query: str = "") -> dict | None:
         song = random.choice(candidates)
         await db.set_state(recent_key, json.dumps((recent + [song["youtubeId"]])[-20:]))
         return song
+
+
+async def record_delivery(channel_id: int, song: dict) -> None:
+    """Resolve 'play that again' from a confirmed post, not an attempted selection."""
+    try:
+        await db.set_state(f'music_last_delivered:{channel_id}', song['youtubeId'])
+    except Exception as exc:
+        log.warning('Unable to remember delivered song (%s)', type(exc).__name__)
 
 
 async def idle_song(row: dict) -> dict | None:

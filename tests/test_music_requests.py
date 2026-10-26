@@ -132,7 +132,7 @@ class PlaylistRequestTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(message.reply.await_args.args[0], 'Apocalypse - Cigarettes After Sex\nhttps://www.youtube.com/watch?v=sElE_BfQ67s')
         self.assertFalse(message.reply.await_args.kwargs['mention_author'])
         self.assertFalse(message.reply.await_args.kwargs['allowed_mentions'].users)
-        remember.assert_awaited_once_with(message.reply.return_value)
+        remember.assert_awaited_once_with(message.reply.return_value, description='')
         self.assertIsNone(await db.get_state('music_idle:10'))
 
     async def test_no_match_or_database_error_uses_discreet_reply(self):

@@ -392,6 +392,7 @@ class HousekeepingCog(commands.Cog):
                 # Ordinary URLs let Discord create a native playable YouTube preview.
                 sent = await channel.send(f"{line}\nhttps://www.youtube.com/watch?v={song['youtubeId']}",
                                    allowed_mentions=discord.AllowedMentions.none())
+                await music.record_delivery(channel.id, song)
                 await memory.log_delivery(sent)
                 await db.record_bot_activity(channel.guild.id, channel.id)
                 await engagement.mark_sent(channel.id)

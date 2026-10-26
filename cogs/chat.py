@@ -87,11 +87,11 @@ class ChatCog(commands.Cog):
 
     async def _prepare_reaction(self, message, reply: str, *, avatar_only: bool = False):
         try:
-            image = await self._avatar_reaction(message, reply)
             media = None
-            if not image and not avatar_only:
+            if not avatar_only:
                 media = await asyncio.wait_for(self._automatic_media.choose(
-                    message.channel.id, message.content, reply), timeout=12)
+                    message.channel.id, message.content, reply), timeout=30)
+            image = None if media else await self._avatar_reaction(message, reply)
             return image, media
         except Exception as exc:
             log.info("Skipped delayed optional reaction (%s)", type(exc).__name__)
@@ -155,6 +155,7 @@ class ChatCog(commands.Cog):
 
         content = message.content or ""
         guild_id = message.guild.id if message.guild else None
+        reply_to = await self._resolve_reference(message)
 
         await memory.log_message(
             channel_id=message.channel.id,
@@ -163,6 +164,7 @@ class ChatCog(commands.Cog):
             author_name=message.author.display_name,
             content=content[:2000] if content else "[embed/attachment]",
             is_bot=message.author.bot,
+            reply_to_author_id=reply_to.author.id if reply_to else None,
         )
 
         if message.author.bot:
@@ -179,14 +181,14 @@ class ChatCog(commands.Cog):
 
         mode = await self._detect_mode(message)
         if memory.has_member_fact_candidate(content):
-            memory.background(memory.extract_and_store_memories(
+            memory.queue_member_learning(
                 channel_id=message.channel.id,
                 user_message=content,
                 user_name=message.author.display_name,
                 bot_reply="",
                 guild_id=guild_id,
                 user_id=message.author.id,
-            ))
+            )
         if mode is None:
             return
         preference_scope = guild_id if guild_id is not None else 0
@@ -257,6 +259,7 @@ class ChatCog(commands.Cog):
                 author_name="Nixi",
                 content=fixed_reply + ("\n[AI-edited avatar caricature delivered]" if avatar_image else ""),
                 is_bot=True,
+                reply_to_author_id=message.author.id,
             )
             if pending_reaction:
                 memory.background(self._finish_reaction(message, sent, pending_reaction))
@@ -304,7 +307,7 @@ class ChatCog(commands.Cog):
                 current_author_id=message.author.id,
                 nixi_author_id=self.bot.user.id,
                 owner_notified=owner_notified,
-                reply_to=getattr(getattr(message, "reference", None), "resolved", None),
+                reply_to=reply_to,
                 introduction_opportunity=await charm.introduction_opportunity(message, mode, preferences),
             )
 
@@ -353,7 +356,7 @@ class ChatCog(commands.Cog):
             return
 
         reply_kwargs = {"embed": actions._media_embed(reaction_media)} if reaction_media else {}
-        delivered_text = "" if reaction_media and reaction_media.standalone and message.author.id != config.OWNER_ID else reply_text
+        delivered_text = reply_text
         try:
             sent = await avatar_edits.send_reply(message, avatar_image, delivered_text or None) if avatar_image else None
             if sent is None:
@@ -378,9 +381,26 @@ class ChatCog(commands.Cog):
             content=delivered_text + (f"\n[Automatic media delivered: {reaction_media.title[:200]}]" if reaction_media else "")
                     + ("\n[AI-edited avatar caricature delivered]" if avatar_image else ""),
             is_bot=True,
+            reply_to_author_id=message.author.id,
         )
         if pending_reaction:
             memory.background(self._finish_reaction(message, sent, pending_reaction))
+
+    async def _resolve_reference(self, message: discord.Message) -> discord.Message | None:
+        reference = getattr(message, 'reference', None)
+        if not reference or not reference.message_id:
+            return None
+        resolved = reference.resolved
+        if resolved is None and getattr(reference, 'channel_id', message.channel.id) == message.channel.id:
+            try:
+                resolved = await asyncio.wait_for(message.channel.fetch_message(reference.message_id), timeout=2)
+            except (discord.HTTPException, asyncio.TimeoutError, AttributeError):
+                return None
+        if (isinstance(resolved, discord.Message) and resolved.channel.id == message.channel.id
+                and (resolved.guild.id if resolved.guild else None) == (message.guild.id if message.guild else None)):
+            reference.resolved = resolved
+            return resolved
+        return None
 
     async def _detect_mode(self, message: discord.Message) -> str | None:
         """Determine why Nixi should speak, or return None for silence."""
@@ -402,7 +422,9 @@ class ChatCog(commands.Cog):
 
         if message.reference and message.reference.message_id:
             ref = message.reference.resolved
-            if isinstance(ref, discord.Message) and self.bot.user:
+            if (isinstance(ref, discord.Message) and self.bot.user
+                    and ref.channel.id == message.channel.id
+                    and (ref.guild.id if ref.guild else None) == (message.guild.id if message.guild else None)):
                 if ref.author.id == self.bot.user.id:
                     return "REPLY_CHAIN"
 

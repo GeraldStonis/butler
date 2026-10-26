@@ -34,7 +34,7 @@ def save(directory: Path, phase: str, value: dict) -> None:
 
 
 def safe_error(exc: Exception) -> dict:
-    status = getattr(getattr(exc, 'response', None), 'status_code', None)
+    status = getattr(exc, 'status_code', None) or getattr(getattr(exc, 'response', None), 'status_code', None)
     match = re.search(r'\bHTTP\s+([45]\d\d)\b', str(exc)) if status is None else None
     return {'type': type(exc).__name__, 'http_status': status or (int(match[1]) if match else None)}
 
@@ -383,6 +383,14 @@ async def services_phase(directory: Path, only: set[str]) -> None:
             response = await client.head(result.url)
         return {'found': True, 'title': result.title, 'media_status': response.status_code,
                 'content_type': response.headers.get('content-type'), 'attribution': result.attribution}
+    async def reaction_gif():
+        result = await media.fetch_available_gif('skeptical reaction', fallback_action='stare')
+        if not result:
+            return {'found': False}
+        async with httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
+            response = await client.head(result.url)
+        return {'found': True, 'media_status': response.status_code,
+                'content_type': response.headers.get('content-type'), 'attribution': result.attribution}
     async def memes():
         first, second = await media.fetch_meme(), await media.fetch_meme()
         files = []
@@ -413,7 +421,7 @@ async def services_phase(directory: Path, only: set[str]) -> None:
         data = response.json()
         return {'valid_identifier': bool(re.fullmatch(r'[A-Za-z0-9_-]+', str(data.get('id') or data.get('_id') or '')))}
     for name, operation in [('web_search', web), ('news_search', news), ('image_search', image),
-                            ('tea_gif', gif), ('two_free_static_memes', memes),
+                            ('tea_gif', gif), ('reaction_gif', reaction_gif), ('two_free_static_memes', memes),
                             ('trivia', trivia), ('cards', cards), ('cat_metadata', cat)]:
         if not only or name in only:
             await check(name, operation)
@@ -510,7 +518,7 @@ def main():
     if args.only:
         allowed = ({case[0] for case in MODEL_CASES} | {'search_grounding', 'search_injection', 'search_links_requested'}
                    if args.phase == 'model' else {'web_search', 'news_search', 'image_search', 'tea_gif',
-                       'two_free_static_memes', 'trivia', 'cards', 'cat_metadata'})
+                       'reaction_gif', 'two_free_static_memes', 'trivia', 'cards', 'cat_metadata'})
         if set(args.only) - allowed:
             parser.error('Unknown case ID in --only')
     random.seed(20261021)

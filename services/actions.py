@@ -128,7 +128,8 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             url = f"https://www.youtube.com/watch?v={song['youtubeId']}"
             sent = await message.reply(f"{label}\n{url}".strip(), mention_author=False,
                                        allowed_mentions=discord.AllowedMentions.none())
-            await memory.log_delivery(sent)
+            await music.record_delivery(message.channel.id, song)
+            await _remember_result(sent, '')
             return True
 
         if name == "avatar_edit":

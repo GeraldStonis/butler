@@ -1,0 +1,65 @@
+{
+  "scope": "Fictional members only. Existing Ollama model and GIF sources. No Discord sends. Automatic-media sampling forced to 100% for relevance/provider probes, not a production frequency measurement. Substring checks are narrow signals; humor needs human review.",
+  "learned_facts": [],
+  "cases": [
+    {
+      "id": "drink_binding_after_other_member",
+      "input": "nixi which drink do I prefer?",
+      "reply": "",
+      "checks": {
+        "nonempty": false,
+        "expected_detail": false,
+        "no_other_member_detail": true
+      }
+    },
+    {
+      "id": "game_binding_after_other_member",
+      "input": "nixi which game do I like?",
+      "reply": "",
+      "checks": {
+        "nonempty": false,
+        "expected_detail": false,
+        "no_other_member_detail": true
+      }
+    },
+    {
+      "id": "current_correction",
+      "input": "nixi I prefer tea now, not coffee. Which drink should you pick for me?",
+      "reply": "",
+      "checks": {
+        "nonempty": false,
+        "expected_detail": false
+      }
+    },
+    {
+      "id": "comic_avatar_indecision",
+      "input": "nixi I spent three hours choosing an avatar and picked the old one",
+      "reply": "",
+      "checks": {
+        "nonempty": false
+      }
+    },
+    {
+      "id": "comic_gaming_boast",
+      "input": "nixi meri aim itni achhi hai ki enemies mujhe dekh ke surrender kar dete hain",
+      "reply": "",
+      "checks": {
+        "nonempty": false
+      }
+    },
+    {
+      "id": "live_automatic_gif_1",
+      "selected": false,
+      "kind": "other_or_none",
+      "url": null,
+      "keeps_text": true
+    },
+    {
+      "id": "live_automatic_gif_2",
+      "selected": false,
+      "kind": "other_or_none",
+      "url": null,
+      "keeps_text": true
+    }
+  ]
+}

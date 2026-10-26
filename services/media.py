@@ -7,6 +7,8 @@ import asyncio
 import random
 import re
 import hashlib
+import json
+import time
 from dataclasses import dataclass
 from urllib.parse import quote, urlsplit, urlunsplit
 
@@ -17,6 +19,13 @@ from services import search, database as db, llm
 
 log = logging.getLogger("nixi.media")
 _gif_selection_lock = asyncio.Lock()
+_gif_provider_backoff: tuple[str, float] = ('', 0)
+
+
+class GifProviderError(RuntimeError):
+    def __init__(self, message: str, retry_after: int = 30):
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 @dataclass
@@ -73,6 +82,8 @@ REACTION_CATEGORIES = {
     'high_five': 'highfive', 'fist_bump': 'handshake', 'smack': 'slap', 'hit': 'punch',
     'glare': 'stare', 'boop': 'poke',
 }
+CONTEXTUAL_REACTIONS = ('stare', 'facepalm', 'shrug', 'clap', 'nod', 'laugh', 'dance',
+                        'wave', 'smug', 'shocked', 'think', 'nope', 'confused', 'happy', 'blush', 'tableflip')
 
 
 def _gif_url(url: str) -> bool:
@@ -89,15 +100,25 @@ async def _choose_gif(candidates: list[tuple[str, MediaResult]], query: str, *, 
         return None
     key = 'gif_last:' + hashlib.sha256(query.casefold().strip().encode()).hexdigest()
     async with _gif_selection_lock:
+        try:
+            recent = json.loads(await db.get_state('gif_recent') or '[]')
+        except ValueError:
+            recent = []
+        if not isinstance(recent, list):
+            recent = []
+        async def remember(gif_key):
+            await db.set_state(key, gif_key)
+            await db.set_state('gif_recent', json.dumps(([v for v in recent if v != gif_key] + [gif_key])[-40:]))
         for gif_key, result in candidates:
             if await db.claim_reaction_gif(gif_key):
-                await db.set_state(key, gif_key)
+                await remember(gif_key)
                 return result
         if allow_reuse:
             last = await db.get_state(key)
             pool = [item for item in candidates if item[0] != last] or candidates
-            gif_key, result = random.choice(pool)
-            await db.set_state(key, gif_key)
+            fresh = [item for item in pool if item[0] not in recent]
+            gif_key, result = random.choice(fresh) if fresh else min(pool, key=lambda item: recent.index(item[0]) if item[0] in recent else -1)
+            await remember(gif_key)
             return result
     return None
 
@@ -188,9 +209,11 @@ async def fetch_gif(query: str, *, avoid_repeats: bool = False, allow_reuse: boo
         except httpx.HTTPStatusError as exc:
             # Never surface a provider URL containing its API key.
             log.warning("GIPHY request failed (HTTP %d)", exc.response.status_code)
-            raise RuntimeError(f"GIPHY request failed (HTTP {exc.response.status_code})") from None
+            status = exc.response.status_code
+            raise GifProviderError(f"GIPHY request failed (HTTP {status})",
+                                   900 if status in {401, 403} else 60 if status == 429 else 30) from None
         except httpx.RequestError:
-            raise RuntimeError("Could not connect to GIPHY") from None
+            raise GifProviderError("Could not connect to GIPHY") from None
         return await _choose_gif(seen_candidates, query, allow_reuse=allow_reuse) if allow_reuse else None
     if not config.TENOR_API_KEY:
         return None
@@ -223,16 +246,23 @@ async def fetch_gif(query: str, *, avoid_repeats: bool = False, allow_reuse: boo
     return await _choose_gif(candidates, query, allow_reuse=allow_reuse)
 
 
-async def fetch_available_gif(query: str, *, allow_reuse: bool = True) -> MediaResult | None:
+async def fetch_available_gif(query: str, *, allow_reuse: bool = True, fallback_action: str = '') -> MediaResult | None:
     """Use ranked GIFs, free action categories, then actual animated search results."""
-    try:
-        result = await fetch_gif(query, avoid_repeats=True, allow_reuse=allow_reuse)
-        if result:
-            return result
-    except (RuntimeError, httpx.HTTPError):
-        log.info('Trying alternative GIF sources after provider failure')
+    global _gif_provider_backoff
+    provider = hashlib.sha256((config.GIPHY_API_KEY or config.TENOR_API_KEY or '').encode()).hexdigest()
+    blocked, until = _gif_provider_backoff
+    if provider != blocked or time.monotonic() >= until:
+        try:
+            result = await fetch_gif(query, avoid_repeats=True, allow_reuse=allow_reuse)
+            if result:
+                return result
+        except (RuntimeError, httpx.HTTPError) as exc:
+            if isinstance(exc, GifProviderError):
+                _gif_provider_backoff = (provider, time.monotonic() + exc.retry_after)
+            log.info('Trying alternative GIF sources after provider failure')
     from services.intent import _reaction_action
-    category = REACTION_CATEGORIES.get(_reaction_action(query.casefold()))
+    category = (fallback_action if fallback_action in CONTEXTUAL_REACTIONS else
+                REACTION_CATEGORIES.get(_reaction_action(query.casefold())))
     if category:
         try:
             async with httpx.AsyncClient(timeout=10, headers={'User-Agent': config.GIF_USER_AGENT}) as client:
@@ -255,7 +285,8 @@ async def fetch_available_gif(query: str, *, allow_reuse: bool = True) -> MediaR
             for item in items if _gif_url(url := item.image_url or item.url)]
         return await _choose_gif(candidates, query, allow_reuse=allow_reuse)
     except (httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
-        log.info('Animated GIF search fallback skipped (%s)', type(exc).__name__)
+        status = getattr(getattr(exc, 'response', None), 'status_code', None)
+        log.info('Animated GIF search fallback skipped (%s, HTTP %s)', type(exc).__name__, status)
         return None
 
 

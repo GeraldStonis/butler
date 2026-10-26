@@ -216,6 +216,10 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
     for name in ("avatar_edits", "flirting", "introductions"):
         if name not in preference_columns:
             await db.execute(f"ALTER TABLE member_preferences ADD COLUMN {name} INTEGER NOT NULL DEFAULT 1")
+    cursor = await db.execute("PRAGMA table_info(messages)")
+    message_columns = {row["name"] for row in await cursor.fetchall()}
+    if "reply_to_author_id" not in message_columns:
+        await db.execute("ALTER TABLE messages ADD COLUMN reply_to_author_id INTEGER")
     await db.commit()
 
 
@@ -228,14 +232,15 @@ async def save_message(
     author_name: str,
     content: str,
     is_bot: bool = False,
+    reply_to_author_id: int | None = None,
 ) -> None:
     """Store a single message in the rolling buffer."""
     db = await get_db()
     await db.execute(
         """INSERT INTO messages
-           (channel_id, guild_id, author_id, author_name, is_bot, content)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (channel_id, guild_id, author_id, author_name, int(is_bot), content),
+           (channel_id, guild_id, author_id, author_name, is_bot, content, reply_to_author_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (channel_id, guild_id, author_id, author_name, int(is_bot), content, reply_to_author_id),
     )
     await db.commit()
 
@@ -538,7 +543,7 @@ async def get_recent_messages(
     limit = limit or config.CONTEXT_WINDOW_SIZE
     db = await get_db()
     cursor = await db.execute(
-        """SELECT id, author_id, author_name, is_bot, content, created_at
+        """SELECT id, author_id, author_name, is_bot, content, created_at, reply_to_author_id
            FROM messages
            WHERE channel_id = ?
            ORDER BY id DESC
@@ -554,6 +559,7 @@ async def get_recent_messages(
             "is_bot": bool(row["is_bot"]),
             "content": row["content"],
             "created_at": row["created_at"],
+            "reply_to_author_id": row["reply_to_author_id"],
         }
         for row in reversed(rows)  # oldest first
     ]
@@ -574,7 +580,7 @@ async def get_oldest_messages(channel_id: int, limit: int) -> list[dict]:
     """Fetch the oldest N messages for a channel (for summarisation)."""
     db = await get_db()
     cursor = await db.execute(
-        """SELECT id, author_id, author_name, is_bot, content, created_at
+        """SELECT id, author_id, author_name, is_bot, content, created_at, reply_to_author_id
            FROM messages
            WHERE channel_id = ?
            ORDER BY id ASC

@@ -84,8 +84,8 @@ IMGFLIP_GIF_CAPTIONS_ENABLED: bool = _bool_env("IMGFLIP_GIF_CAPTIONS_ENABLED", F
 IMGFLIP_GIF_DAILY_LIMIT: int = max(0, int(os.environ.get("IMGFLIP_GIF_DAILY_LIMIT", "3")))
 MEDIA_SAFE_MODE: bool = _bool_env("MEDIA_SAFE_MODE", True)
 AUTOMATIC_MEDIA_ENABLED: bool = _bool_env("AUTOMATIC_MEDIA_ENABLED", True)
-AUTOMATIC_MEDIA_COOLDOWN_SECONDS: int = max(0, int(os.environ.get("AUTOMATIC_MEDIA_COOLDOWN_SECONDS", "300")))
-AUTOMATIC_MEDIA_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("AUTOMATIC_MEDIA_CHANCE", "0.15"))))
+AUTOMATIC_MEDIA_COOLDOWN_SECONDS: int = max(0, int(os.environ.get("AUTOMATIC_MEDIA_COOLDOWN_SECONDS", "90")))
+AUTOMATIC_MEDIA_CHANCE: float = min(1.0, max(0.0, float(os.environ.get("AUTOMATIC_MEDIA_CHANCE", "0.4"))))
 
 # Optional Cloudflare avatar edits; enabled for members unless they opt out.
 CLOUDFLARE_ACCOUNT_ID: str = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()

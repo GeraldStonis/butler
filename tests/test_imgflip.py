@@ -247,7 +247,7 @@ class ImgflipTests(unittest.IsolatedAsyncioTestCase):
             fetch.assert_not_awaited()
             with patch.object(config, 'IMGFLIP_GIF_CAPTIONS_ENABLED', True):
                 reaction = await social.AutomaticMedia().choose(10, 'a joke', 'a comeback')
-        self.assertTrue(reaction.standalone)
+        self.assertFalse(reaction.standalone)
         fetch.assert_awaited_once_with('mock disbelief')
 
 

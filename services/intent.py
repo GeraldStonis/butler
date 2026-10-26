@@ -153,22 +153,28 @@ def ping_request(text: str, mentions: list | None = None) -> OwnerIntent | None:
 def _song_request(text: str) -> OwnerIntent | None:
     text = re.sub(r"<@!?\d+>", "", text).strip(" ,:!?.\n")
     match = re.match(
-        r"^(?:(?:hey|yo|please|pls)[\s,:]+)*(?:(?:can|could|would|will)\s+you\s+)?"
+        r"^(?:(?:hey|yo|please|pls)[\s,:]+)*(?:(?:can|could|would|will)\s+(?:you|u)\s+)?(?:please\s+)?"
         r"(play|put on|queue|send|share|give|gimme|recommend|suggest|drop)\s+(?:(?:me|us)\s+)?(.+)$",
         text, re.I,
     )
     if match:
         verb, query = match.groups()
     else:
-        hindi = re.fullmatch(
-            r"(.+?)\s+(?:bajao|baja\s+do|chalao|chala\s+do|lagao|laga\s+do|sunao|suna\s+do)[.!?]*", text, re.I,
+        hindi_prefix = re.fullmatch(
+            r"(?:mujhe\s+)?(?:bajao|baja\s+do|chalao|chala\s+do|sunao|suna\s+do)\s+(.+?)(?:\s+(?:na|please|pls))?",
+            text, re.I,
         )
-        if not hindi:
+        hindi = re.fullmatch(
+            r"(.+?)\s+(?:bajao|baja\s+do|chalao|chala\s+do|lagao|laga\s+do|sunao|suna\s+do)(?:\s+(?:na|please|pls))?[.!?]*", text, re.I,
+        )
+        if not hindi and not hindi_prefix:
             return None
-        query = re.sub(r"^(?:mujhe|hume|hame)\s+", "", hindi[1], flags=re.I)
-        if not re.search(r"\b(?:gaana|gana|gaane|gane|song|music)\b", query, re.I):
+        query = re.sub(r"^(?:mujhe|hume|hame)\s+", "", (hindi_prefix or hindi)[1], flags=re.I)
+        if not hindi_prefix and not re.search(r"\b(?:gaana|gana|gaane|gane|song|music)\b", query, re.I):
             return None
-        query = re.sub(r"\b(?:gaana|gana|gaane|gane|koi|kuch|ek|sa)\b", " ", query, flags=re.I)
+        query = re.sub(r"\b(?:gaana|gana|gaane|gane|song|music)\b", " ", query, flags=re.I)
+        if re.fullmatch(r"\s*(?:(?:koi|kuch|ek|sa|accha|acha|bhi)\s*)*", query, re.I):
+            query = ''
         query = " ".join(query.split())
         return OwnerIntent('song', query=query)
     musical = re.search(r"\b(?:songs?|music|tracks?|tunes?|playlist)\b", query, re.I)
@@ -190,7 +196,8 @@ def _song_request(text: str) -> OwnerIntent | None:
         return None
     if re.search(r"\b(?:vc|voice(?:\s+(?:channel|chat))?)\b", query, re.I):
         return OwnerIntent("chat")  # Sharing a preview is not voice playback.
-    query = re.sub(r"(?:,?\s+(?:please|pls))+$", "", query, flags=re.I).strip(" .!?\"'")
+    query = re.sub(r"(?:,?\s+(?:please|pls|bhai|bro|yaar|for me|for us))+$", "", query, flags=re.I).strip(" .!?\"'")
+    query = re.sub(r"\s+(?:from|off)\s+(?:(?:your|the|my|our)\s+)?playlist$", "", query, flags=re.I)
     if re.fullmatch(
         r"(?:(?:a|an|some|any|another|random|one|more)\s+)*(?:random\s+)?"
         r"(?:songs?|music|tracks?|tunes?|something|one)"

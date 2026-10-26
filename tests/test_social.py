@@ -63,7 +63,7 @@ class SocialTests(unittest.IsolatedAsyncioTestCase):
         result = media.MediaResult('laugh', 'https://example.com/laugh.gif')
         with patch('config.AUTOMATIC_MEDIA_ENABLED', True), patch('config.AUTOMATIC_MEDIA_CHANCE', 1.0), patch('config.AUTOMATIC_MEDIA_COOLDOWN_SECONDS', 180), patch('services.social.random.random', return_value=0), patch.object(social.llm, 'generate_response', AsyncMock(return_value='{"kind":"gif","sentiment":"absurd amusement","adds_punchline":true,"visual_punchline":"The detective physically collapses trying to follow the absurd alibi.","gif_queries":["cartoon detective wheezing"]}')), patch.object(media, 'fetch_available_gif', AsyncMock(return_value=result)) as fetch:
             self.assertIs(await service.choose(10, 'my joke', 'Nice one.'), result)
-            fetch.assert_awaited_once_with('cartoon detective wheezing', allow_reuse=False)
+            fetch.assert_awaited_once_with('cartoon detective wheezing', allow_reuse=True)
             self.assertIsNone(await service.choose(10, 'another joke', 'Ha.'))
             self.assertIs(await service.choose(11, 'my joke', 'Nice one.'), result)
 
@@ -77,14 +77,14 @@ class SocialTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(await social.AutomaticMedia().choose(10, 'serious question', 'Factual answer'))
             fetch.assert_not_awaited()
 
-    async def test_roast_gif_can_be_selected_as_the_entire_reply(self):
+    async def test_roast_gif_keeps_the_text_reply(self):
         result = media.MediaResult('Side eye', 'https://example.com/roast.gif')
         with patch('config.AUTOMATIC_MEDIA_ENABLED', True), patch('config.AUTOMATIC_MEDIA_CHANCE', 1.0), patch('services.social.random.random', return_value=0), patch.object(social.llm, 'generate_response', AsyncMock(return_value='{"kind":"gif","sentiment":"mock disbelief","adds_punchline":true,"visual_punchline":"The judge waits in silence for evidence of the grand claim.","gif_queries":["judge judy skeptical stare"],"delivery":"media_only"}')), patch.object(media, 'fetch_available_gif', AsyncMock(return_value=result)) as fetch:
             reaction = await social.AutomaticMedia().choose(10, 'I am the greatest yapper alive', 'The silence disagrees.')
-            self.assertTrue(reaction.standalone)
-            fetch.assert_awaited_once_with('judge judy skeptical stare', allow_reuse=False)
+            self.assertFalse(reaction.standalone)
+            fetch.assert_awaited_once_with('judge judy skeptical stare', allow_reuse=True)
 
-    async def test_standalone_gif_delivery_has_no_unused_text_in_history(self):
+    async def test_automatic_gif_never_discards_the_answer_or_its_history(self):
         cog = ChatCog(SimpleNamespace(user=SimpleNamespace(id=999)))
         cog._detect_mode = AsyncMock(return_value='DIRECT_ADDRESS')
         result = media.MediaResult('Side eye', 'https://example.com/roast.gif', standalone=True)
@@ -92,9 +92,9 @@ class SocialTests(unittest.IsolatedAsyncioTestCase):
         message = SimpleNamespace(author=SimpleNamespace(id=config.OWNER_ID + 1, name='Guest', display_name='Guest', bot=False), content='nixi am I a genius?', guild=None, channel=SimpleNamespace(id=10, typing=MagicMock()), reply=AsyncMock())
         with patch('cogs.chat.memory.log_message', AsyncMock()) as logged, patch('cogs.chat.db.record_user_activity', AsyncMock()), patch('cogs.chat.memory.extract_and_store_memories', AsyncMock()), patch('cogs.chat.memory.build_context', AsyncMock(return_value=[{'role': 'user', 'content': message.content}])), patch('cogs.chat.social.classify_guest_message', AsyncMock(return_value='question')), patch('cogs.chat.llm.generate_response', AsyncMock(return_value='An unused caption.')):
             await cog._handle_message(message)
-            self.assertEqual(message.reply.call_args.args, (None,))
+            self.assertEqual(message.reply.call_args.args, ('An unused caption.',))
             self.assertEqual(message.reply.call_args.kwargs['embed'].image.url, result.url)
-            self.assertNotIn('An unused caption', logged.call_args.kwargs['content'])
+            self.assertIn('An unused caption', logged.call_args.kwargs['content'])
 
     async def test_normal_guest_question_can_receive_independent_embed(self):
         cog = ChatCog(SimpleNamespace(user=SimpleNamespace(id=999)))

@@ -114,7 +114,8 @@ async def generate_response(
                         return re.sub(r"^(?:\[)?Nixi(?:\])?:\s*", "", content, flags=re.I)
         return failure_reply if failure_reply is not None else FALLBACK_REACTION
     except Exception as exc:
-        log.warning("LLM call failed (%s)", type(exc).__name__)
+        status = getattr(exc, 'status_code', None) or getattr(getattr(exc, 'response', None), 'status_code', None)
+        log.warning("LLM call failed (%s, HTTP %s)", type(exc).__name__, status)
         if failure_reply is not None:
             return failure_reply
         return FALLBACK_REACTION

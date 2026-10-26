@@ -44,7 +44,7 @@ The key design rule is simple:
   Random selection excludes the requester and never uses the dead-chat priority
   weight. Roles, everyone/here and invented targets cannot be notified.
 - Owner-requested literal text is not rewritten or discarded just for repetition,
-  and optional reaction GIFs cannot replace his answer. If model generation or
+  and optional reaction GIFs cannot replace the answer for any member. If model generation or
   filtering yields no text, a small reaction keeps the owner from getting silence.
 - Short, same-person follow-ups continue for up to 90 seconds without another
   mention, limited to two follow-ups. Another speaker breaks that continuation.
@@ -114,24 +114,32 @@ The key design rule is simple:
 - Rolling channel memory, summaries, long-term memories, and owner instructions.
 - Server emoji support without forcing an emoji into every reply.
 - Occasional contextual GIF/meme/captioned-cat reactions can accompany Nixi's replies.
-  Defaults: enabled, 15% sampling, 300 seconds between attempts per channel.
+  Defaults: enabled, 40% sampling, 90 seconds between selected media per channel.
   This is a chance to consider media, not a posting quota. Greetings, thanks,
   distress, explanations, exact-word requests and long/code replies bypass it.
-  The selector defaults to no media, including for most banter. Media requires
-  an explicit decision that a specific visual adds a new punchline, with a short
-  explanation; missing/invalid decisions are skipped. Memes also need title relevance.
+  Sampled banter, roasts and comic situations can get a fitting facial reaction or
+  visual joke, not only an entirely new punchline. The selector must explain its
+  relevance; missing/invalid decisions are skipped. Memes also need title relevance.
   The LLM infers its reply's sentiment and comic intent, then generates specific
   GIF search phrases rather than choosing fixed reaction queries. It avoids
-  recent queries; automatic searches skip GIF IDs already selected in SQLite,
-  including across restarts. Empty/repeated results trigger a fresh search phrase.
+  recent queries and prefers unseen GIF IDs in SQLite. When a result pool is
+  exhausted, it rotates older matching GIFs using persistent recent history rather
+  than going permanently silent. Empty/repeated results trigger a fresh search phrase.
   Automatic searches also try up to three ranked result pages when earlier pages
-  have been exhausted. Direct requests keep the first-result behavior.
-  Automatic media gets 12 seconds; if delayed, Nixi sends the text without it.
-  The LLM can choose an embed-only reply when the GIF itself is the punchline.
+  have been exhausted. Explicit requests still prefer the first unseen result.
+  Automatic selection has a 30-second background budget. Text goes out immediately;
+  a delayed GIF edits that same reply without replacing its words. GIFs take
+  precedence over optional avatar caricatures. Rejected/failed selections use only
+  a 20-second attempt backoff, not the full successful-media cooldown.
+  GIF fallbacks also work for automatic replies. Authentication failures bypass
+  the primary provider for 15 minutes; a changed key is tried immediately.
+  The model supplies an allowlisted expression (for example, skeptical stare or
+  facepalm) as well as its search phrases, so the existing no-key action-GIF
+  fallback can still match the response when GIPHY/search is unavailable.
   Explicit GIF/action requests bypass this sampling and cooldown, and scheduled
   meme drops use their own settings. Existing Railway variables override defaults:
-  set `AUTOMATIC_MEDIA_CHANCE=0.15` and `AUTOMATIC_MEDIA_COOLDOWN_SECONDS=300`
-  in the service's Variables if they still contain the older frequent settings.
+  set `AUTOMATIC_MEDIA_ENABLED=true`, `AUTOMATIC_MEDIA_CHANCE=0.4` and
+  `AUTOMATIC_MEDIA_COOLDOWN_SECONDS=90` in the service's Variables to use this cadence.
 - Bot watcher rules for alerts from other bots.
 - Optional Cloudflare cartoon-avatar comebacks, enabled for members unless they
   opt out, plus owner-requested edits. Images never change actual profiles.
@@ -169,7 +177,7 @@ Roasts can happen naturally during mutual banter without a command, but are not
 mandatory. Current distress, discomfort, sincere questions and saved boundaries
 override old chemistry. Replies remain generated, not selected from a line list;
 there are no random personality modes or permanent "nice/rude user" labels.
-Automatic GIFs retain their separate, infrequent visual-punchline checks.
+Automatic GIFs retain their separate sampling and relevance checks.
 
 The persona mirrors the current speaker's language, rhythm, formality, and slang,
 including natural AAVE-influenced phrasing when it fits. It does not infer a
@@ -265,7 +273,19 @@ Discord, so renames do not lose facts and matching names do not merge people.
 During conversations with Nixi and clear self-reports in server chat (for example,
 "I prefer coffee"), preferences and interests are learned in the background without
 posting a reply just to acknowledge learning. The extractor reads only the member's message,
-requires a supporting quote, and replaces older values for the same topic.
+requires a supporting quote, and replaces older corrected values for the same topic.
+It recognizes common Hinglish self-reports, drink habits and music tastes too.
+Compatible additive interests can be retained rather than overwritten. Per-member
+extractions run in arrival order, so a slower old extraction cannot undo a newer one.
+Pending self-reports remain available to that member's same-channel follow-up while
+learning finishes, without blocking text delivery or sharing pending private-channel text.
+All supported fact fields are retrieved, with current-speaker IDs and target IDs
+attached in the final request envelope. Explicit mentions work with a partial member
+cache; ambiguous display names are not used to merge profiles. New bot history
+records the actual member being answered, not the nearest historical speaker.
+Uncached Discord reply references are fetched with a two-second deadline; missing,
+deleted or foreign-channel references are ignored. The SQLite column is migrated
+automatically on startup, preserving existing data; old recipients are not guessed.
 It does not scan old server history or import ambiguous legacy conversation facts.
 The existing owner-only `/restart` also resets the current channel's recent memory.
 
@@ -641,6 +661,11 @@ played, including a single-track playlist. Titles are resolved before mood tags,
 so "Happy & Sad by Kacey Musgraves" is a song request, not two competing moods.
 Title/artist combinations, "play the song ...", modest unambiguous title typos,
 shortened titles and common Hinglish requests such as "koi gaana suna do" work.
+Requests such as "bajao Namo Namo", "koi gaana bajao na" and "play Apocalypse bhai"
+also route directly, for guests and Ronix. "Play that again" reuses the last
+successfully delivered song in this channel, persists across restarts, and never
+uses a merely attempted selection as proof of delivery. This is a YouTube chat
+preview, not voice-channel audio playback.
 Unknown or ambiguously misspelled titles are not replaced by random tracks.
 Relative playlist paths resolve against the project directory. Either supported
 filename can fall back to the other when missing.

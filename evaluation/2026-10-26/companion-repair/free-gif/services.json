@@ -1,0 +1,13 @@
+{
+  "scope": "Low-volume API checks; no Discord posts, avatar uploads or paid endpoints.",
+  "checks": [
+    {
+      "id": "reaction_gif",
+      "found": true,
+      "media_status": 200,
+      "content_type": "image/gif",
+      "attribution": "nekos.best",
+      "seconds": 2.068
+    }
+  ]
+}
