@@ -26,7 +26,7 @@ class AutomaticMediaTests(unittest.IsolatedAsyncioTestCase):
         self.model = self.enterContext(patch.object(social.llm, 'generate_response',
             AsyncMock(return_value=json.dumps(self.decision))))
         self.result = media.MediaResult('No evidence', 'https://images.test/evidence.gif')
-        self.gif = self.enterContext(patch.object(media, 'fetch_gif', AsyncMock(return_value=self.result)))
+        self.gif = self.enterContext(patch.object(media, 'fetch_available_gif', AsyncMock(return_value=self.result)))
         self.meme = self.enterContext(patch.object(media, 'fetch_meme', AsyncMock()))
         self.cat = self.enterContext(patch.object(media, 'fetch_cat', AsyncMock()))
         self.captioned = self.enterContext(patch.object(media, 'fetch_captioned_gif', AsyncMock()))
@@ -75,7 +75,7 @@ class AutomaticMediaTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_valid_visual_punchline_can_be_delivered(self):
         self.assertIs(await self.service.choose(10, self.content, self.reply), self.result)
-        self.gif.assert_awaited_once_with('detective empty folder', avoid_repeats=True)
+        self.gif.assert_awaited_once_with('detective empty folder', allow_reuse=False)
         self.assertFalse(self.result.standalone)
         instructions = self.model.await_args.args[0][0]['content']
         self.assertIn('Text alone is the default', instructions)

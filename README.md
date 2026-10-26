@@ -67,6 +67,10 @@ The key design rule is simple:
   requests use this path. Mentions are optional: without a confirmed target,
   Nixi posts the GIF without a tag, including in DMs. He does not demand a mention
   or guess a random recipient. A failed GIF search never becomes an AI image.
+  Untargeted physical requests such as "nixi jump", "laugh", "dance" or "run"
+  also send matching GIFs. Hitting, slapping, kicking, kissing and similar actions
+  use this path too. Explicit GIF scenes preserve the requested subject, such as
+  a dancing cat, rather than replacing it with a generic dance.
   Explicit avatar/drawing requests remain separate, and no-pings preferences
   suppress notifications without removing the visible tag.
 - Public service replies stay in character. Provider failures, missing settings,
@@ -422,8 +426,17 @@ IMGFLIP_API_KEY=
 ```
 
 Tavily powers web/news/image search. Brave is an optional legacy alternative
-used when Tavily is not configured. GIPHY powers GIFs and action GIFs;
-Tenor is a legacy fallback when GIPHY is not configured.
+used when Tavily is not configured. GIFs first try GIPHY; Tenor remains a legacy
+option when GIPHY is not configured. Missing/rejected credentials, empty searches
+and provider failures can fall back to free [nekos.best action GIFs](https://docs.nekos.best/getting-started/introduction.html),
+then actual `.gif` results from the existing image-search provider. Static images
+are not substituted for GIFs. Jumping and tea/coffee service use search when no
+matching free action category exists. Keep Tavily configured for those searches.
+The optional `GIF_USER_AGENT` identifies this project to nekos.best; its default
+already works for this repository. No extra API key is needed for that provider.
+Manual GIF requests skip previously selected IDs first and rotate older matching
+results if a small result pool is exhausted. Optional automatic reactions can
+still skip a reply rather than repeat an old GIF; their low frequency is unchanged.
 GIPHY messages include attribution. Its standard API documentation requires
 client-side searches; contact GIPHY about approval for this server-side bot integration.
 
@@ -462,7 +475,8 @@ AI-caption, watermark-removal, or template-upload endpoints are used.
 See [Imgflip's API documentation](https://imgflip.com/api) for its current terms.
 
 Imgflip does not replace GIPHY for ordinary reaction GIF searches, tea/coffee
-serving, or action GIFs. Those still require a valid `GIPHY_API_KEY`.
+serving, or action GIFs. Those use the GIF providers and fallbacks described above;
+the free action fallback does not require `GIPHY_API_KEY`.
 
 ## Important Config
 
@@ -622,7 +636,19 @@ language or unknown title is never silently replaced by an unrelated song. Reque
 bypass idle timing, quiet hours and the lottery; `MUSIC_DROP_ENABLED` and
 `MUSIC_CHANNEL_IDS` control only unsolicited drops. Song history is shared between
 requested and idle posts, persists across restarts, and avoids the last 20 songs
-when possible. Explicitly requesting a particular track allows replaying it.
+when possible. Explicit requests still work when all matching tracks were recently
+played, including a single-track playlist. Titles are resolved before mood tags,
+so "Happy & Sad by Kacey Musgraves" is a song request, not two competing moods.
+Title/artist combinations, "play the song ...", modest unambiguous title typos,
+shortened titles and common Hinglish requests such as "koi gaana suna do" work.
+Unknown or ambiguously misspelled titles are not replaced by random tracks.
+Relative playlist paths resolve against the project directory. Either supported
+filename can fall back to the other when missing.
+Duplicate YouTube IDs remain one random-selection entry, but all original title
+and artist labels stay searchable as aliases. This preserves alternate names and
+credit styles instead of silently overwriting them. If two rows label the same
+video as different songs/versions, Nixi still uses that supplied video ID: aliases
+cannot correct mislabeled audio in the source catalog.
 
 Video IDs are validated and duplicate playlist entries are collapsed. Once a channel
 has had no human activity for a randomly chosen 10-15 minutes, Nixi gets exactly

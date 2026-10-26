@@ -69,8 +69,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
     def test_explicit_avatar_edits_keep_the_requested_scene(self):
         for text in ['nixi edit <@20>\'s avatar to hug a teddy bear',
                      'nixi draw <@20> giving a handshake',
-                     'nixi make an image of <@20> getting a headpat',
-                     'nixi make <@20> eat grass in a field']:
+                     'nixi make an image of <@20> getting a headpat']:
             with self.subTest(text=text):
                 self.assertEqual(intent.heuristic_intent(text, [self.target]).name, 'avatar_edit')
 
@@ -86,7 +85,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
     async def test_each_requested_action_delivers_only_gif_and_target_tag(self):
         for action in ['handshake', 'punch', 'kiss', 'kick', 'hug', 'pat']:
             message = self.message(f'nixi give <@20> a {action}')
-            with self.subTest(action=action), patch.object(media, 'fetch_gif', AsyncMock(return_value=self.result)) as fetch:
+            with self.subTest(action=action), patch.object(media, 'fetch_available_gif', AsyncMock(return_value=self.result)) as fetch:
                 await self.cog._handle_message(message)
                 fetch.assert_awaited_once_with(media.SAFE_ACTION_QUERIES[action])
                 message.reply.assert_not_awaited()
@@ -108,7 +107,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
         for result in [None, RuntimeError('Provider unavailable')]:
             message = self.message('nixi give <@20> a kiss')
             provider = AsyncMock(side_effect=result) if isinstance(result, Exception) else AsyncMock(return_value=None)
-            with patch.object(media, 'fetch_gif', provider):
+            with patch.object(media, 'fetch_available_gif', provider):
                 if isinstance(result, Exception):
                     with self.assertLogs('nixi.actions', level='ERROR'):
                         await self.cog._handle_message(message)
@@ -123,7 +122,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
     async def test_guest_handshake_request_uses_the_same_gif_path(self):
         guest = SimpleNamespace(id=21, bot=False, name='guest2', display_name='Guest 2')
         message = self.message('nixi give <@20> a handshake', author=guest)
-        with patch.object(media, 'fetch_gif', AsyncMock(return_value=self.result)) as fetch:
+        with patch.object(media, 'fetch_available_gif', AsyncMock(return_value=self.result)) as fetch:
             await self.cog._handle_message(message)
         fetch.assert_awaited_once_with(media.SAFE_ACTION_QUERIES['handshake'])
         self.assertEqual(message.channel.send.await_args.args, ('<@20>',))
@@ -132,7 +131,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_missing_member_sends_untagged_gif_without_requesting_a_mention(self):
         message = self.message('nixi give someone a hug', mentions=[])
-        with patch.object(media, 'fetch_gif', AsyncMock(return_value=self.result)) as fetch:
+        with patch.object(media, 'fetch_available_gif', AsyncMock(return_value=self.result)) as fetch:
             await self.cog._handle_message(message)
         fetch.assert_awaited_once_with(media.SAFE_ACTION_QUERIES['hug'])
         message.reply.assert_not_awaited()
@@ -145,7 +144,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
     async def test_owner_request_respects_target_notification_preference(self):
         await db.set_member_preferences(1, 20, {'pings': False})
         message = self.message('nixi hug <@20>')
-        with patch.object(media, 'fetch_gif', AsyncMock(return_value=self.result)):
+        with patch.object(media, 'fetch_available_gif', AsyncMock(return_value=self.result)):
             await self.cog._handle_message(message)
         self.assertEqual(message.channel.send.await_args.args, ('<@20>',))
         self.assertFalse(message.channel.send.await_args.kwargs['allowed_mentions'].users)
@@ -156,7 +155,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
             return self.result
 
         message = self.message('nixi hug <@20>')
-        with patch.object(media, 'fetch_gif', AsyncMock(side_effect=fetch)):
+        with patch.object(media, 'fetch_available_gif', AsyncMock(side_effect=fetch)):
             await self.cog._handle_message(message)
         message.channel.send.assert_not_awaited()
         self.edit.assert_not_awaited()
@@ -170,7 +169,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.action, 'celebratory dab')
         self.assertEqual(request.target_user_id, 20)
         self.assertIn('NOT an AI caricature', model.await_args.args[0][0]['content'])
-        with patch.object(media, 'fetch_gif', AsyncMock(return_value=self.result)) as fetch:
+        with patch.object(media, 'fetch_available_gif', AsyncMock(return_value=self.result)) as fetch:
             self.assertTrue(await actions.execute_owner_intent(self.message(text), request))
         fetch.assert_awaited_once_with('funny celebratory dab gif')
 
@@ -180,7 +179,7 @@ class ActionGifTests(unittest.IsolatedAsyncioTestCase):
                 request = await intent.classify_owner_intent('nixi do something goofy for <@20>', [self.target])
                 self.assertEqual(request.name, 'action_gif')
                 self.assertEqual(request.action, '')
-                with patch.object(media, 'fetch_gif', AsyncMock()) as fetch:
+                with patch.object(media, 'fetch_available_gif', AsyncMock()) as fetch:
                     self.assertTrue(await actions.execute_owner_intent(self.message('nixi do something goofy for <@20>'), request))
                     fetch.assert_not_awaited()
         self.edit.assert_not_awaited()

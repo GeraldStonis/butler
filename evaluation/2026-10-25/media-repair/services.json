@@ -1,0 +1,13 @@
+{
+  "scope": "Low-volume API checks; no Discord posts, avatar uploads or paid endpoints.",
+  "checks": [
+    {
+      "id": "tea_gif",
+      "error": {
+        "type": "RuntimeError",
+        "http_status": 401
+      },
+      "seconds": 0.53
+    }
+  ]
+}

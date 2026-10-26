@@ -69,7 +69,7 @@ class DiscreetActionTests(unittest.IsolatedAsyncioTestCase):
                                reply=AsyncMock(), channel=SimpleNamespace(id=10, send=AsyncMock()))
 
     async def test_empty_media_results_get_generated_replies_not_error_strings(self):
-        for name, provider in [('gif_search', 'fetch_gif'), ('image_search', 'fetch_image'),
+        for name, provider in [('gif_search', 'fetch_available_gif'), ('image_search', 'fetch_image'),
                                ('cat', 'fetch_cat'), ('meme', 'fetch_meme'),
                                ('tea', 'fetch_tea_or_coffee'), ('coffee', 'fetch_tea_or_coffee'),
                                ('action_gif', 'fetch_action_gif')]:
@@ -82,7 +82,7 @@ class DiscreetActionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_provider_exception_is_logged_without_exposing_its_body(self):
         message = self.message()
-        with patch.object(media, 'fetch_gif', AsyncMock(side_effect=RuntimeError('private-key HTTP 401'))), self.assertLogs('nixi.actions', level='ERROR') as logs:
+        with patch.object(media, 'fetch_available_gif', AsyncMock(side_effect=RuntimeError('private-key HTTP 401'))), self.assertLogs('nixi.actions', level='ERROR') as logs:
             await actions.execute_owner_intent(message, intent.OwnerIntent('gif_search', query='handshake'))
         self.assertEqual(message.reply.await_args.args[0], self.generated.return_value)
         self.generated.assert_awaited_once_with(message.content, is_owner=True)

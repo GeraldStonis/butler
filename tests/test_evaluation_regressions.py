@@ -105,7 +105,7 @@ class DeliveryRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.sent.embeds = [discord.Embed().set_image(url=self.result.url)]
         self.message = SimpleNamespace(author=SimpleNamespace(id=config.OWNER_ID), guild=self.sent.guild,
             channel=self.sent.channel, content='nixi request', mentions=[], reply=AsyncMock(return_value=self.sent))
-        for name in ('fetch_cat', 'fetch_image', 'fetch_gif', 'fetch_tea_or_coffee'):
+        for name in ('fetch_cat', 'fetch_image', 'fetch_available_gif', 'fetch_tea_or_coffee'):
             self.enterContext(patch.object(media, name, AsyncMock(return_value=self.result)))
         self.enterContext(patch.object(search, 'web_search', AsyncMock(return_value=[])))
         self.enterContext(patch.object(search, 'summarize_results', AsyncMock(return_value=self.sent.content)))
@@ -203,9 +203,9 @@ class MoodRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await music.select_song(10, 'Assamese'))
         self.assertEqual((await music.select_song(10, 'Happy & Sad'))['youtubeId'], 'aaaaaaaaaaa')
 
-    async def test_single_mood_candidate_is_not_repeated_immediately(self):
+    async def test_explicit_mood_request_can_replay_its_only_matching_track(self):
         self.assertIsNotNone(await music.select_song(10, 'party'))
-        self.assertIsNone(await music.select_song(10, 'party'))
+        self.assertEqual((await music.select_song(10, 'party'))['youtubeId'], 'ccccccccccc')
         self.assertIsNotNone(await music.select_song(10, 'Bright Nights'))
 
     def test_sidecar_tags_only_augment_real_ids_and_preserve_explicit_metadata(self):

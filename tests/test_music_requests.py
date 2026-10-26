@@ -59,7 +59,7 @@ class SongIntentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_semantic_song_requests_are_allowlisted_without_invented_urls(self):
         with patch.object(intent.llm, 'generate_response', AsyncMock(return_value='{"intent":"song","query":"vibes"}')) as model:
-            request = await intent.classify_owner_intent('nixi kuch gaana suna do')
+            request = await intent.classify_owner_intent('nixi apne playlist se kuch accha suggest karna')
         self.assertEqual((request.name, request.query), ('song', 'vibes'))
         self.assertIn('local playlist', model.await_args.args[0][0]['content'])
 

@@ -6,6 +6,7 @@ import logging
 import asyncio
 import random
 import re
+import hashlib
 from dataclasses import dataclass
 from urllib.parse import quote, urlsplit, urlunsplit
 
@@ -15,6 +16,7 @@ import config
 from services import search, database as db, llm
 
 log = logging.getLogger("nixi.media")
+_gif_selection_lock = asyncio.Lock()
 
 
 @dataclass
@@ -48,7 +50,56 @@ SAFE_ACTION_QUERIES = {
     "stare": "dramatic stare gif",
     "tea": "tea serving",
     "coffee": "coffee serving",
+    "hit": "funny cartoon hitting gif",
+    "jump": "funny jumping gif",
+    "dance": "funny dancing gif",
+    "run": "funny running gif",
+    "laugh": "laughing reaction gif",
+    "clap": "clapping applause gif",
+    "bow": "bowing politely gif",
+    "cry": "crying reaction gif",
+    "sleep": "sleeping gif",
+    "nod": "nodding yes gif",
+    "salute": "saluting gif",
+    "shrug": "shrug reaction gif",
+    "facepalm": "facepalm reaction gif",
+    "spin": "spinning gif",
 }
+
+REACTION_CATEGORIES = {
+    **{name: name for name in ('handshake', 'pat', 'punch', 'bonk', 'slap', 'hug', 'kiss',
+        'kick', 'poke', 'cuddle', 'tickle', 'wave', 'yeet', 'stare', 'dance', 'run', 'laugh',
+        'clap', 'cry', 'sleep', 'nod', 'salute', 'shrug', 'facepalm', 'spin')},
+    'high_five': 'highfive', 'fist_bump': 'handshake', 'smack': 'slap', 'hit': 'punch',
+    'glare': 'stare', 'boop': 'poke',
+}
+
+
+def _gif_url(url: str) -> bool:
+    try:
+        parts = urlsplit(url)
+        return (parts.scheme == 'https' and bool(parts.hostname) and not parts.username
+                and not parts.password and parts.path.lower().endswith('.gif'))
+    except (TypeError, ValueError):
+        return False
+
+
+async def _choose_gif(candidates: list[tuple[str, MediaResult]], query: str, *, allow_reuse: bool = False) -> MediaResult | None:
+    if not candidates:
+        return None
+    key = 'gif_last:' + hashlib.sha256(query.casefold().strip().encode()).hexdigest()
+    async with _gif_selection_lock:
+        for gif_key, result in candidates:
+            if await db.claim_reaction_gif(gif_key):
+                await db.set_state(key, gif_key)
+                return result
+        if allow_reuse:
+            last = await db.get_state(key)
+            pool = [item for item in candidates if item[0] != last] or candidates
+            gif_key, result = random.choice(pool)
+            await db.set_state(key, gif_key)
+            return result
+    return None
 
 
 async def fetch_meme() -> MediaResult | None:
@@ -98,7 +149,7 @@ async def fetch_cat() -> MediaResult | None:
     return MediaResult(title=caption, url=f"https://cataas.com/cat/{cat_id}/says/{quote(caption, safe='')}")
 
 
-async def fetch_gif(query: str, *, avoid_repeats: bool = False) -> MediaResult | None:
+async def fetch_gif(query: str, *, avoid_repeats: bool = False, allow_reuse: bool = False) -> MediaResult | None:
     """Fetch a GIPHY GIF, using legacy Tenor only when GIPHY is unset."""
     if config.GIPHY_API_KEY:
         params = {
@@ -108,6 +159,7 @@ async def fetch_gif(query: str, *, avoid_repeats: bool = False) -> MediaResult |
         }
         # Search beyond exhausted first-page results, without changing owner ranking.
         offsets = (0, 8, 16) if avoid_repeats else (0,)
+        seen_candidates = []
         try:
             async with httpx.AsyncClient(timeout=12) as client:
                 for offset in offsets:
@@ -116,7 +168,8 @@ async def fetch_gif(query: str, *, avoid_repeats: bool = False) -> MediaResult |
                     response.raise_for_status()
                     results = response.json().get("data", [])
                     if not results:
-                        return None
+                        break
+                    page = []
                     for item in results:
                         images = item.get("images", {})
                         rendition = images.get("downsized") or images.get("original") or {}
@@ -124,17 +177,21 @@ async def fetch_gif(query: str, *, avoid_repeats: bool = False) -> MediaResult |
                         if not url:
                             continue
                         gif_key = "giphy:" + str(item.get("id") or _meme_url_key(url))
-                        if avoid_repeats and not await db.claim_reaction_gif(gif_key):
-                            continue
-                        return MediaResult(title=item.get("title") or query, url=url,
-                                           source_url=item.get("url", ""), attribution="Powered By GIPHY")
+                        page.append((gif_key, MediaResult(title=item.get("title") or query, url=url,
+                                           source_url=item.get("url", ""), attribution="Powered By GIPHY")))
+                    if page and not avoid_repeats:
+                        return page[0][1]
+                    selected = await _choose_gif(page, query)
+                    if selected:
+                        return selected
+                    seen_candidates.extend(page)
         except httpx.HTTPStatusError as exc:
             # Never surface a provider URL containing its API key.
             log.warning("GIPHY request failed (HTTP %d)", exc.response.status_code)
             raise RuntimeError(f"GIPHY request failed (HTTP {exc.response.status_code})") from None
         except httpx.RequestError:
             raise RuntimeError("Could not connect to GIPHY") from None
-        return None
+        return await _choose_gif(seen_candidates, query, allow_reuse=allow_reuse) if allow_reuse else None
     if not config.TENOR_API_KEY:
         return None
     params = {
@@ -152,6 +209,7 @@ async def fetch_gif(query: str, *, avoid_repeats: bool = False) -> MediaResult |
     if not results:
         return None
     random.shuffle(results)
+    candidates = []
     for item in results:
         formats = item.get("media_formats", {})
         rendition = formats.get("gif") or formats.get("tinygif") or {}
@@ -159,10 +217,46 @@ async def fetch_gif(query: str, *, avoid_repeats: bool = False) -> MediaResult |
         if not url:
             continue
         gif_key = "tenor:" + str(item.get("id") or _meme_url_key(url))
-        if avoid_repeats and not await db.claim_reaction_gif(gif_key):
-            continue
-        return MediaResult(title=item.get("content_description") or query, url=url, source_url=item.get("itemurl", ""))
-    return None
+        candidates.append((gif_key, MediaResult(title=item.get("content_description") or query, url=url, source_url=item.get("itemurl", ""))))
+    if not avoid_repeats:
+        return candidates[0][1] if candidates else None
+    return await _choose_gif(candidates, query, allow_reuse=allow_reuse)
+
+
+async def fetch_available_gif(query: str, *, allow_reuse: bool = True) -> MediaResult | None:
+    """Use ranked GIFs, free action categories, then actual animated search results."""
+    try:
+        result = await fetch_gif(query, avoid_repeats=True, allow_reuse=allow_reuse)
+        if result:
+            return result
+    except (RuntimeError, httpx.HTTPError):
+        log.info('Trying alternative GIF sources after provider failure')
+    from services.intent import _reaction_action
+    category = REACTION_CATEGORIES.get(_reaction_action(query.casefold()))
+    if category:
+        try:
+            async with httpx.AsyncClient(timeout=10, headers={'User-Agent': config.GIF_USER_AGENT}) as client:
+                response = await client.get(f'https://nekos.best/api/v2/{category}', params={'amount': 8})
+                response.raise_for_status()
+                items = response.json().get('results', [])
+            candidates = [('nekos:' + _meme_url_key(item['url']), MediaResult(
+                title=f'{category} GIF', url=item['url'], attribution='nekos.best'))
+                for item in items if isinstance(item, dict) and _gif_url(item.get('url', ''))]
+            result = await _choose_gif(candidates, query, allow_reuse=allow_reuse)
+            if result:
+                return result
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
+            log.info('Action GIF fallback skipped (%s)', type(exc).__name__)
+    try:
+        # Unlike ordinary image search, never substitute a still image for a GIF.
+        items = await search.image_search(query + ' animated gif', count=8)
+        candidates = [('search:' + _meme_url_key(url), MediaResult(
+            title=item.title, url=url, source_url=item.url))
+            for item in items if _gif_url(url := item.image_url or item.url)]
+        return await _choose_gif(candidates, query, allow_reuse=allow_reuse)
+    except (httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
+        log.info('Animated GIF search fallback skipped (%s)', type(exc).__name__)
+        return None
 
 
 async def fetch_image(query: str) -> MediaResult | None:
@@ -175,8 +269,8 @@ async def fetch_image(query: str) -> MediaResult | None:
 
 
 async def fetch_tea_or_coffee(kind: str) -> MediaResult | None:
-    """Fetch the first serving GIF rather than substituting a still image."""
-    return await fetch_gif(SAFE_ACTION_QUERIES[kind])
+    """Rotate matching serving GIFs, never substitute a still image."""
+    return await fetch_available_gif(SAFE_ACTION_QUERIES[kind])
 
 
 async def fetch_action_gif(action: str) -> MediaResult | None:
@@ -185,4 +279,4 @@ async def fetch_action_gif(action: str) -> MediaResult | None:
     if not 1 <= len(normalized) <= 60 or re.search(r"https?://|<[^>]*>|@|[\r\n]", normalized, re.I):
         return None
     query = SAFE_ACTION_QUERIES.get(normalized, f"funny {normalized.replace('_', ' ')} gif")
-    return await fetch_gif(query)
+    return await fetch_available_gif(query)

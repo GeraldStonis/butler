@@ -46,7 +46,7 @@ class GuestRequestTests(unittest.IsolatedAsyncioTestCase):
             ('nixi send a meme', 'fetch_meme'),
             ('nixi serve me some tea', 'fetch_tea_or_coffee'),
             ('nixi send coffee', 'fetch_tea_or_coffee'),
-            ('nixi send a gif of a dancing cat', 'fetch_gif'),
+            ('nixi send a gif of a dancing cat', 'fetch_available_gif'),
             ('nixi show an image of mountains', 'fetch_image'),
         ]
         for index, (text, provider) in enumerate(cases):

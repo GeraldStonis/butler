@@ -30,6 +30,20 @@ ACTION_PATTERNS = {
     "stare": r"star(?:e|es|ing)",
     "yeet": r"yeet(?:s|ing)?",
     "smack": r"smack(?:s|ing)?",
+    "hit": r"hits?|hitting",
+    "jump": r"jumps?|jumping|leap(?:s|ing)?|kood(?:o|na)?|kud(?:o|na)?",
+    "dance": r"danc(?:e|es|ing)|naach(?:o|na)?|nach(?:o|na)?",
+    "run": r"runs?|running|jog(?:s|ging)?",
+    "laugh": r"laugh(?:s|ing)?|haso|hanso",
+    "clap": r"claps?|clapping",
+    "bow": r"bows?|bowing",
+    "cry": r"cry|cries|crying",
+    "sleep": r"sleeps?|sleeping|nap(?:s|ping)?",
+    "nod": r"nods?|nodding",
+    "salute": r"salut(?:e|es|ing)",
+    "shrug": r"shrugs?|shrugging",
+    "facepalm": r"face[ -]?palms?|facepalming",
+    "spin": r"spins?|spinning|twirls?|twirling",
     "tea": r"tea|chai",
     "coffee": r"coffee|espresso|latte",
 }
@@ -62,12 +76,16 @@ def _actionable_text(text: str) -> str | None:
             and re.search(r"\b(?:brew|brewing|memes?|gifs?|avatars?|trivia|quiz)\b", cleaned, re.I)
             and not re.search(r"\b(?:latest|today|current|new)\b", cleaned, re.I)):
         return None
+    # Negation inside an explicitly requested track title is not an instruction.
+    if _song_request(cleaned):
+        return cleaned
     negative = re.search(
         r"\b(?:don't|dont|do not|never|stop|avoid)\s+(?:(?:you|please|ever)\s+)*"
         r"(?:send(?:ing)?|serv(?:e|ing)|play(?:ing)?|start(?:ing)?|find(?:ing)?|fetch(?:ing)?|"
         r"post(?:ing)?|shar(?:e|ing)|giv(?:e|ing)|get(?:ting)?|show(?:ing)?|"
         r"brew(?:ing)?|bring(?:ing)?|pour(?:ing)?|search(?:ing)?|hug(?:ging)?|punch(?:ing)?|"
-        r"kiss(?:ing)?|edit(?:ting)?|generat(?:e|ing)|make|making|ping(?:ing)?|tag(?:ging)?)\b"
+        r"kiss(?:ing)?|(?:jump|dance|laugh|clap|hit|kick|slap|run|bow|cry|sleep|nod|spin)\w*|"
+        r"edit(?:ting)?|generat(?:e|ing)|make|making|ping(?:ing)?|tag(?:ging)?)\b"
         r"|\b(?:can|could|would|will)\s+you\s+(?:not|never)\b|\bmat\s+(?:kar\w*|bhej\w*|do|dena)\b",
         cleaned, re.I,
     )
@@ -139,9 +157,20 @@ def _song_request(text: str) -> OwnerIntent | None:
         r"(play|put on|queue|send|share|give|gimme|recommend|suggest|drop)\s+(?:(?:me|us)\s+)?(.+)$",
         text, re.I,
     )
-    if not match:
-        return None
-    verb, query = match.groups()
+    if match:
+        verb, query = match.groups()
+    else:
+        hindi = re.fullmatch(
+            r"(.+?)\s+(?:bajao|baja\s+do|chalao|chala\s+do|lagao|laga\s+do|sunao|suna\s+do)[.!?]*", text, re.I,
+        )
+        if not hindi:
+            return None
+        query = re.sub(r"^(?:mujhe|hume|hame)\s+", "", hindi[1], flags=re.I)
+        if not re.search(r"\b(?:gaana|gana|gaane|gane|song|music)\b", query, re.I):
+            return None
+        query = re.sub(r"\b(?:gaana|gana|gaane|gane|koi|kuch|ek|sa)\b", " ", query, flags=re.I)
+        query = " ".join(query.split())
+        return OwnerIntent('song', query=query)
     musical = re.search(r"\b(?:songs?|music|tracks?|tunes?|playlist)\b", query, re.I)
     if verb.lower() not in {"play", "put on", "queue"} and not musical:
         return None
@@ -150,7 +179,13 @@ def _song_request(text: str) -> OwnerIntent | None:
     ):
         return None
     if re.search(r"\b(?:gifs?|memes?|images?|pictures?|videos?|games?|trivia|quiz|cards|chess)\b", query, re.I):
-        return None
+        # Real titles such as "Video Games" and "House of Cards" are still music.
+        from services import music
+        candidate = re.sub(r"^(?:(?:the|a|some)\s+)?(?:song|track)\s+(?:(?:called|named|titled)\s+)?", "", query, flags=re.I)
+        generic = re.fullmatch(r"(?:(?:a|the|some)\s+)?(?:games?|trivia|quiz|cards|chess|gifs?)", candidate, re.I)
+        matches, explicit = music._matching_songs(music.load_songs(), music._normalized(candidate)) if not generic or musical else ([], False)
+        if not matches or not explicit:
+            return None
     if re.search(r"\b(?:higher[ -](?:or[ -])?lower|high[ -]low)\b", query, re.I):
         return None
     if re.search(r"\b(?:vc|voice(?:\s+(?:channel|chat))?)\b", query, re.I):
@@ -164,9 +199,10 @@ def _song_request(text: str) -> OwnerIntent | None:
     ):
         query = ""
     else:
-        query = re.sub(r"^(?:(?:a|some|any)\s+)?(?:songs?|music|tracks?|tunes?|something)\s+", "", query, flags=re.I)
+        query = re.sub(r"^(?:(?:the|a|some|any)\s+)?(?:songs?|music|tracks?|tunes?|something)\s+", "", query, flags=re.I)
         query = re.sub(r"^(?:called|named|titled|by|from|a|some)\s+", "", query, flags=re.I)
         query = re.sub(r"\s+(?:songs?|music|tracks?|tunes?)$", "", query, flags=re.I)
+        query = re.sub(r"\s+for\s+(?:me|us)$", "", query, flags=re.I)
     return OwnerIntent("song", query=query.strip(" \"'"))
 
 
@@ -200,7 +236,9 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
                      or not re.search(r"\bgifs?\b", lower) and re.search(r"\b(?:edit|image|picture|photo|portrait|illustration)\b", lower))
     action = _reaction_action(lower)
     if (action and action not in {"tea", "coffee"} and not informational and not negated and not explicit_edit
-            and (reaction_target_id or re.match(r"^(?:(?:hey|please)\s+)*(?:(?:can|could|would|will)\s+you\s+)?(?:give|send|show|make|go|" + ACTION_PATTERNS[action] + r")\b", lower))):
+            and (reaction_target_id or not re.search(r"\bgifs?\b", lower))
+            and (re.match(r"^(?:(?:hey|yo|please|pls|just)\s+)*(?:(?:can|could|would|will)\s+you\s+)?(?:give|send|show|make|go|do|perform|shake|" + ACTION_PATTERNS[action] + r")\b", lower)
+                 or re.search(r"\b(?:karo|kar\s+do|maaro|maro|de\s+do|pilao)\b", lower))):
         return OwnerIntent("action_gif", action=action, target_user_id=reaction_target_id)
 
     scene = avatar_edits.scene_from_text(lower)
@@ -210,7 +248,8 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
                          and re.search(r"\b(?:image|picture|photo|portrait|illustration|caricature)\b", lower))
     if (not informational and not negated
             and re.search(r"\b(?:edit|roast|dress|put|make|create|generate|turn|change|depict|portray|draw|paint|render)\b", lower)
-            and (re.search(r"\b(?:avatar|pfp|profile picture)\b", lower) or directed_edit or requested_picture or target_id and scene)):
+            and (re.search(r"\b(?:avatar|pfp|profile picture)\b", lower)
+                 or directed_edit and explicit_edit or requested_picture or target_id and scene)):
         return OwnerIntent("avatar_edit", query=cleaned, action=scene, target_user_id=target_id)
 
     if re.search(r"\b(?:start|play|host|give|gimme|launch)\b.*\b(?:trivia|quiz)\b", lower) or lower in {"trivia", "quiz"}:
@@ -260,6 +299,12 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
     gif_match = re.search(r"\b(?:gif|reaction gif)\s+(?:of|for)?\s*(.+)", lower)
     if gif_match:
         return OwnerIntent("gif_search", query=gif_match.group(1).strip())
+    if re.search(r"\bgifs?\b", lower) and not informational and not negated:
+        query = re.sub(r"^(?:(?:hey|yo|please|pls)\s+)*(?:(?:can|could|would|will)\s+you\s+)?(?:send|show|find|fetch|give|gimme|share|play|search\s+for)\s+", "", lower)
+        query = re.sub(r"^(?:me\s+)?(?:a|an|some)\s+|\b(?:gifs?|please|pls)\b", " ", query)
+        query = re.sub(r"\s+for\s+(?:me|us)$", "", query.strip(" .!?"))
+        if query.strip():
+            return OwnerIntent("gif_search", query=" ".join(query.split()))
 
     image_match = re.search(r"\b(?:image|picture|photo|pic)\s+(?:of|for)?\s*(.+)", lower)
     if image_match:
@@ -309,8 +354,12 @@ async def classify_owner_intent(text: str, mentions: list | None = None) -> Owne
                 "Never invent a video ID or URL. Explicit requests for voice-channel playback "
                 "are chat, because the bot shares previews, not voice audio. Questions about "
                 "music or how playback works are chat, not song requests. "
-                "Use action_gif for social actions toward a member, such as giving a handshake, "
-                "punch, kiss, kick, hug, pat, high five, fist bump, wave, or a similar reaction. "
+                "Use action_gif for requested physical actions, including untargeted jumping, "
+                "running, dancing, laughing, hitting, bowing, clapping, sleeping and similar gestures, "
+                "or actions toward a member such as a handshake, punch, kiss, kick, hug, pat, "
+                "high five, fist bump or wave. Do not refuse because a bot has no physical body: "
+                "the application performs the gesture using a real matching GIF. Abstract actions "
+                "such as explaining, choosing or writing remain chat. "
                 "Set action to a short plain-English action phrase; do not invent a target ID. "
                 "These requests mean search for an existing reaction GIF and tag the member, "
                 "NOT an AI caricature, even when phrased as 'make @user hug someone'. "

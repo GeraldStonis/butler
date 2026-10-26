@@ -210,7 +210,7 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
 
         if name == "gif_search":
             query = owner_intent.query or message.content
-            result = await media.fetch_gif(query)
+            result = await media.fetch_available_gif(query)
             if not result:
                 await reply_discreetly(message, name, "no_gif")
                 return True

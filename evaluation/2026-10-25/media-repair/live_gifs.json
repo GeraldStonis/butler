@@ -1,0 +1,65 @@
+{
+  "cases": [
+    {
+      "action": "punch",
+      "delivered_to_discord": false,
+      "found": true,
+      "url": "https://nekos.best/api/v2/punch/011f8f1c-775e-4835-813e-1004ac013454.gif",
+      "attribution": "nekos.best",
+      "asset_status": 200,
+      "format": "GIF",
+      "frames": 29
+    },
+    {
+      "action": "punch",
+      "delivered_to_discord": false,
+      "found": true,
+      "url": "https://nekos.best/api/v2/punch/362a0ed0-2a6d-4ba0-a374-40875d29c5fa.gif",
+      "attribution": "nekos.best",
+      "asset_status": 200,
+      "format": "GIF",
+      "frames": 41
+    },
+    {
+      "action": "jump",
+      "delivered_to_discord": false,
+      "found": true,
+      "url": "https://i.pinimg.com/originals/27/f2/3a/27f23a405ecaf075779524530b83642f.gif",
+      "attribution": "",
+      "asset_status": 200,
+      "format": "GIF",
+      "frames": 6
+    },
+    {
+      "action": "tea",
+      "delivered_to_discord": false,
+      "found": true,
+      "url": "https://media.tenor.com/p-aT9UjQHXQAAAAM/tea-pour-the-tea.gif",
+      "attribution": "",
+      "asset_status": 200,
+      "format": "GIF",
+      "frames": 34
+    },
+    {
+      "action": "coffee",
+      "delivered_to_discord": false,
+      "found": true,
+      "url": "https://media.tenor.com/Ny0Es5mpN5MAAAAM/coffee-ashita-no-joe.gif",
+      "attribution": "",
+      "asset_status": 200,
+      "format": "GIF",
+      "frames": 16
+    },
+    {
+      "action": "laugh",
+      "delivered_to_discord": false,
+      "found": true,
+      "url": "https://nekos.best/api/v2/laugh/20c9ea10-583d-46ea-b688-bc3301ac4d15.gif",
+      "attribution": "nekos.best",
+      "asset_status": 200,
+      "format": "GIF",
+      "frames": 19
+    }
+  ],
+  "scope": "Generic action queries, no member data or Discord sends."
+}

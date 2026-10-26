@@ -77,6 +77,7 @@ TAVILY_API_KEY: str = os.environ.get("TAVILY_API_KEY", "")
 BRAVE_SEARCH_API_KEY: str = os.environ.get("BRAVE_SEARCH_API_KEY", "")
 TENOR_API_KEY: str = os.environ.get("TENOR_API_KEY", "")
 GIPHY_API_KEY: str = os.environ.get("GIPHY_API_KEY", "")
+GIF_USER_AGENT: str = os.environ.get("GIF_USER_AGENT", "NixiButler (https://github.com/GeraldStonis/butler)")
 IMGFLIP_API_KEY: str = os.environ.get("IMGFLIP_API_KEY", "").strip()
 # Animated captioning is a paid Imgflip endpoint and requires explicit opt-in.
 IMGFLIP_GIF_CAPTIONS_ENABLED: bool = _bool_env("IMGFLIP_GIF_CAPTIONS_ENABLED", False)

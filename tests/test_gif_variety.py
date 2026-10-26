@@ -48,7 +48,7 @@ class GifVarietyTests(unittest.IsolatedAsyncioTestCase):
                         'visual_punchline': 'A silent cat judge refuses to dignify the boast with an answer.',
                         'gif_queries': ['detective skeptical blink', 'cat judges your life choices'], 'delivery': 'media_only'}),
         ]
-        with patch.object(config, 'AUTOMATIC_MEDIA_ENABLED', True), patch.object(config, 'AUTOMATIC_MEDIA_CHANCE', 1.0), patch('services.social.random.random', return_value=0), patch.object(social.llm, 'generate_response', AsyncMock(side_effect=decisions)) as model, patch.object(media, 'fetch_gif', AsyncMock(side_effect=[None, result])) as fetch:
+        with patch.object(config, 'AUTOMATIC_MEDIA_ENABLED', True), patch.object(config, 'AUTOMATIC_MEDIA_CHANCE', 1.0), patch('services.social.random.random', return_value=0), patch.object(social.llm, 'generate_response', AsyncMock(side_effect=decisions)) as model, patch.object(media, 'fetch_available_gif', AsyncMock(side_effect=[None, result])) as fetch:
             selected = await service.choose(10, 'I never make mistakes', 'Your last take disagrees.')
             self.assertIs(selected, result)
             self.assertTrue(result.standalone)

@@ -117,7 +117,8 @@ def guest_kind_hint(content: str) -> str | None:
         r"say|repeat|type|reply|respond|send|fetch|get|give|gimme|share|post|show|write|translate|"
         r"sing|chant|act|pretend|become|ignore|obey|forget|reset|ping|punch|slap|hug|serve|"
         r"bring|make|edit|dress|caption|search|look up|find|start|play|host|launch|bonk|"
-        r"handshake|shake|kiss|kick|pat|headpat|boop|poke|cuddle|tickle|wave|high[ -]?five|fist[ -]?bump"
+        r"handshake|shake|kiss|kick|pat|headpat|boop|poke|cuddle|tickle|wave|high[ -]?five|fist[ -]?bump|"
+        r"jump|leap|hit|laugh|dance|run|jog|clap|bow|nod|cry|sleep|salute|shrug|spin|facepalm"
     )
     if re.search(rf"(?:^|[.!?;]\s*|\band\s+)(?:(?:please|just|now)\s+)*(?:(?:can|could|would|will)\s+you\s+)?(?:{verbs})\b", text):
         return "command"
@@ -324,7 +325,7 @@ class AutomaticMedia:
                             continue
                         recent.append(key)
                         recent[:] = recent[-12:]
-                        result = await media.fetch_gif(query, avoid_repeats=True)
+                        result = await media.fetch_available_gif(query, allow_reuse=False)
                         if result:
                             result.standalone = decision.get("delivery") == "media_only"
                             log.info("Selected contextual GIF: sentiment=%r query=%r", decision.get("sentiment"), query)

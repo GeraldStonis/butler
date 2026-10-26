@@ -285,10 +285,11 @@ class AvatarEditTests(unittest.IsolatedAsyncioTestCase):
         message.author = self.make_member(99)
         message.mentions = [self.member]
         cog = ChatCog(SimpleNamespace(user=SimpleNamespace(id=100)))
-        request = intent.heuristic_intent(message.content, message.mentions)
-        self.assertEqual(request.name, 'avatar_edit')
-        self.assertEqual(request.target_user_id, 20)
-        with patch.object(avatar_edits.llm, 'generate_response', AsyncMock(return_value='{"allowed":true,"scene":"the subject eating grass in a sunny green field"}')) as prepare, patch.object(memory, 'log_message', AsyncMock()) as logged:
+        self.assertIsNone(intent.heuristic_intent(message.content, message.mentions))
+        with patch.object(avatar_edits.llm, 'generate_response', AsyncMock(side_effect=[
+                '{"intent":"avatar_edit"}',
+                '{"allowed":true,"scene":"the subject eating grass in a sunny green field"}',
+        ])) as prepare, patch.object(memory, 'log_message', AsyncMock()) as logged:
             await cog._handle_message(message)
         post = self.requests[-1]
         self.assertEqual(post.method, 'POST')
@@ -416,9 +417,7 @@ class AvatarPreferenceAndIntentTests(unittest.TestCase):
 
     def test_requested_wording_and_other_custom_scenes(self):
         target = SimpleNamespace(id=config.OWNER_ID + 1, bot=False)
-        for text in [f'hey nixi can you make <@{target.id}> eat grass in a field',
-                     f'nixi put <@!{target.id}> on the moon holding a teacup',
-                     f'nixi draw <@{target.id}> as a space explorer',
+        for text in [f'nixi draw <@{target.id}> as a space explorer',
                      f'nixi change <@{target.id}>\'s pfp into a medieval chef']:
             with self.subTest(text=text):
                 request = intent.heuristic_intent(text, [target])

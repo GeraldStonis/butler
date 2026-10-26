@@ -147,7 +147,7 @@ async def offline_phase(directory: Path) -> None:
                 channel=SimpleNamespace(id=10), reply=AsyncMock(return_value=sent))
             with patch.object(media, 'fetch_meme', AsyncMock(return_value=fake_result)), \
                     patch.object(media, 'fetch_tea_or_coffee', AsyncMock(return_value=fake_result)), \
-                    patch.object(media, 'fetch_gif', AsyncMock(return_value=fake_result)), \
+                    patch.object(media, 'fetch_available_gif', AsyncMock(return_value=fake_result)), \
                     patch.object(media, 'fetch_image', AsyncMock(return_value=fake_result)):
                 await actions.execute_owner_intent(message, selected)
                 executed = message.reply.await_count > 0
@@ -185,7 +185,7 @@ async def offline_phase(directory: Path) -> None:
         request = SimpleNamespace(author=SimpleNamespace(id=100), content='nixi a synthetic request',
             channel=SimpleNamespace(id=20), guild=None, reply=AsyncMock(return_value=sent))
         with patch.object(media, 'fetch_tea_or_coffee', AsyncMock(return_value=fake_result)), \
-                patch.object(media, 'fetch_gif', AsyncMock(return_value=fake_result)), \
+                patch.object(media, 'fetch_available_gif', AsyncMock(return_value=fake_result)), \
                 patch.object(media, 'fetch_image', AsyncMock(return_value=fake_result)), \
                 patch.object(media, 'fetch_cat', AsyncMock(return_value=fake_result)), \
                 patch.object(search, 'web_search', AsyncMock(return_value=[])), \
@@ -469,7 +469,7 @@ async def pipeline_phase(directory: Path) -> None:
         with patch.object(llm, 'generate_response', new=measured), \
                 patch.object(media, 'fetch_meme', AsyncMock(return_value=fake)) as meme, \
                 patch.object(media, 'fetch_tea_or_coffee', AsyncMock(return_value=fake)) as tea, \
-                patch.object(media, 'fetch_gif', AsyncMock(return_value=fake)), \
+                patch.object(media, 'fetch_available_gif', AsyncMock(return_value=fake)), \
                 patch.object(media, 'fetch_action_gif', AsyncMock(return_value=fake)) as action_gif, \
                 patch.object(media, 'fetch_image', AsyncMock(return_value=fake)), \
                 patch.object(search, 'web_search', AsyncMock(return_value=[])) as web, \

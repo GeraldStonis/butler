@@ -143,7 +143,7 @@ class PersonalityTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(config, 'AUTOMATIC_MEDIA_ENABLED', True), \
                 patch.object(config, 'AUTOMATIC_MEDIA_CHANCE', 1.0), \
                 patch.object(llm, 'generate_response', AsyncMock()) as selector, \
-                patch.object(media, 'fetch_gif', AsyncMock()) as fetch:
+                patch.object(media, 'fetch_available_gif', AsyncMock()) as fetch:
             self.assertIsNone(await social.AutomaticMedia().choose(10,
                 'nixi mood off hai', 'Bata, kya hua?'))
         selector.assert_not_awaited()

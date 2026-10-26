@@ -1,0 +1,2367 @@
+{
+  "total": 464,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "seconds": 17.578,
+  "modules": {
+    "test_action_gifs": 12,
+    "test_activities_music": 13,
+    "test_automatic_media": 10,
+    "test_avatar_edits": 35,
+    "test_build_install": 6,
+    "test_butler_dignity": 2,
+    "test_charm": 24,
+    "test_chat_latency": 11,
+    "test_companion": 27,
+    "test_context_window": 12,
+    "test_dead_chat": 12,
+    "test_dead_chat_cleanup": 9,
+    "test_dead_chat_priority": 13,
+    "test_discreet_replies": 14,
+    "test_emoji_filter": 4,
+    "test_evaluation_regressions": 21,
+    "test_gif_variety": 4,
+    "test_guest_requests": 17,
+    "test_housekeeping": 4,
+    "test_imgflip": 18,
+    "test_language_style": 30,
+    "test_live_behavior_regressions": 18,
+    "test_llm_models": 7,
+    "test_member_memory": 8,
+    "test_meme_drops": 5,
+    "test_meme_uniqueness": 3,
+    "test_music_requests": 13,
+    "test_opinions": 26,
+    "test_owner_obedience": 20,
+    "test_personality": 13,
+    "test_social": 11,
+    "test_song_and_gif_delivery": 19,
+    "test_spam_quiet_hours": 9,
+    "test_speaker_attribution": 11,
+    "test_sticker_trigger": 3
+  },
+  "tests": [
+    {
+      "test": "test_action_gifs.ActionGifTests.test_each_requested_action_delivers_only_gif_and_target_tag",
+      "status": "pass",
+      "seconds": 0.0953
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_explicit_avatar_edits_keep_the_requested_scene",
+      "status": "pass",
+      "seconds": 0.0039
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_gif_reactions_can_target_ronix_without_changing_avatar_target_rules",
+      "status": "pass",
+      "seconds": 0.0029
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_guest_handshake_request_uses_the_same_gif_path",
+      "status": "pass",
+      "seconds": 0.0285
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_member_can_opt_out_during_provider_request",
+      "status": "pass",
+      "seconds": 0.0283
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_missing_member_sends_untagged_gif_without_requesting_a_mention",
+      "status": "pass",
+      "seconds": 0.0222
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_model_can_classify_additional_social_actions_without_inventing_target",
+      "status": "pass",
+      "seconds": 0.0207
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_model_generated_mentions_or_urls_are_not_sent_to_gif_provider",
+      "status": "pass",
+      "seconds": 0.0083
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_owner_request_respects_target_notification_preference",
+      "status": "pass",
+      "seconds": 0.0312
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_provider_failure_never_falls_back_to_caricature",
+      "status": "pass",
+      "seconds": 0.0407
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_questions_and_negations_are_not_performed_by_fast_path",
+      "status": "pass",
+      "seconds": 0.0037
+    },
+    {
+      "test": "test_action_gifs.ActionGifTests.test_social_actions_are_deterministic_gif_intents",
+      "status": "pass",
+      "seconds": 0.0044
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_bot_posts_do_not_reset_human_idle",
+      "status": "pass",
+      "seconds": 0.0195
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_cards_ties_do_not_award_points_and_rank_ace_high",
+      "status": "pass",
+      "seconds": 0.015
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_each_user_votes_once_and_correct_score_settles_once",
+      "status": "pass",
+      "seconds": 0.0198
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_game_start_requires_a_real_server_member",
+      "status": "pass",
+      "seconds": 0.0148
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_guest_can_start_one_game_when_activities_are_enabled",
+      "status": "pass",
+      "seconds": 0.0159
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_idle_lottery_is_once_per_episode_and_resets",
+      "status": "pass",
+      "seconds": 0.0231
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_music_is_suppressed_during_active_game",
+      "status": "pass",
+      "seconds": 0.0154
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_music_lottery_survives_database_restart",
+      "status": "pass",
+      "seconds": 0.0768
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_music_sends_native_preview_only_if_human_has_not_returned",
+      "status": "pass",
+      "seconds": 0.0232
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_new_card_round_releases_old_view_but_stays_active",
+      "status": "pass",
+      "seconds": 0.0167
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_owner_natural_requests",
+      "status": "pass",
+      "seconds": 0.013
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_song_success_not_repeated_and_invalid_ids_filtered",
+      "status": "pass",
+      "seconds": 0.0334
+    },
+    {
+      "test": "test_activities_music.NewActivitiesTests.test_trivia_decodes_and_never_repeats",
+      "status": "pass",
+      "seconds": 0.0169
+    },
+    {
+      "test": "test_automatic_media.AutomaticMediaTests.test_all_automatic_media_require_specific_extra_punchline",
+      "status": "pass",
+      "seconds": 0.0082
+    },
+    {
+      "test": "test_automatic_media.AutomaticMediaTests.test_cooldown_expires_per_channel_after_five_minutes",
+      "status": "pass",
+      "seconds": 0.0042
+    },
+    {
+      "test": "test_automatic_media.AutomaticMediaTests.test_disabled_reactions_never_call_model",
+      "status": "pass",
+      "seconds": 0.0032
+    },
+    {
+      "test": "test_automatic_media.AutomaticMediaTests.test_no_media_decision_also_limits_repeated_selector_calls",
+      "status": "pass",
+      "seconds": 0.0035
+    },
+    {
+      "test": "test_automatic_media.AutomaticMediaTests.test_obvious_text_only_turns_skip_model_fetch_and_cooldown",
+      "status": "pass",
+      "seconds": 0.0032
+    },
+    {
+      "test": "test_automatic_media.AutomaticMediaTests.test_sampling_is_only_permission_to_consider_media",
+      "status": "pass",
+      "seconds": 0.003
+    },
+    {
+      "test": "test_automatic_media.AutomaticMediaTests.test_selector_can_decline_media_even_when_sampled",
+      "status": "pass",
+      "seconds": 0.0039
+    },
+    {
+      "test": "test_automatic_media.AutomaticMediaTests.test_text_only_turn_does_not_block_following_visual_joke",
+      "status": "pass",
+      "seconds": 0.0034
+    },
+    {
+      "test": "test_automatic_media.AutomaticMediaTests.test_unknown_or_malformed_decisions_fail_closed",
+      "status": "pass",
+      "seconds": 0.0034
+    },
+    {
+      "test": "test_automatic_media.AutomaticMediaTests.test_valid_visual_punchline_can_be_delivered",
+      "status": "pass",
+      "seconds": 0.0033
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_attempt_cooldown_and_global_daily_cap",
+      "status": "pass",
+      "seconds": 0.0608
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_automatic_edits_cannot_use_custom_owner_scenes",
+      "status": "pass",
+      "seconds": 0.0123
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_automatic_edits_skip_serious_messages_owner_and_first_exchange",
+      "status": "pass",
+      "seconds": 0.0205
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_avatar_edit_failure_keeps_existing_reply_media",
+      "status": "pass",
+      "seconds": 0.0241
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_blank_reply_does_not_spend_avatar_budget",
+      "status": "pass",
+      "seconds": 0.0199
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_chat_reenable_acknowledges_external_upload_and_opt_out",
+      "status": "pass",
+      "seconds": 0.033
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_concurrent_requests_do_not_duplicate_uploads",
+      "status": "pass",
+      "seconds": 0.0256
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_custom_scene_classifier_cannot_invent_target_or_replace_request",
+      "status": "pass",
+      "seconds": 0.0148
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_default_members_work_without_opt_in",
+      "status": "pass",
+      "seconds": 0.0416
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_explicit_opt_out_is_server_scoped",
+      "status": "pass",
+      "seconds": 0.0167
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_generation_timeout_releases_lock_and_keeps_attempt_reserved",
+      "status": "pass",
+      "seconds": 0.1222
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_guest_custom_edit_does_not_prepare_or_generate",
+      "status": "pass",
+      "seconds": 0.0125
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_guest_retort_can_include_real_avatar_attachment",
+      "status": "pass",
+      "seconds": 0.0194
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_invalid_response_does_not_deliver_or_retry_immediately",
+      "status": "pass",
+      "seconds": 0.0259
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_legacy_preferences_migrate_to_default_on_without_changing_other_flags",
+      "status": "pass",
+      "seconds": 0.0631
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_model_can_decline_and_opt_out_never_reaches_model",
+      "status": "pass",
+      "seconds": 0.0318
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_model_selects_scene_but_cannot_supply_target_or_custom_prompt",
+      "status": "pass",
+      "seconds": 0.0218
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_multipart_reference_upload_and_real_attachment",
+      "status": "pass",
+      "seconds": 0.0276
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_natural_grass_request_edits_reference_and_tags_target",
+      "status": "pass",
+      "seconds": 0.0354
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_old_zero_default_schema_preserves_disabled_members_but_new_rows_are_enabled",
+      "status": "pass",
+      "seconds": 0.0652
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_opt_out_while_generating_drops_image",
+      "status": "pass",
+      "seconds": 0.0221
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_oversized_image_is_rejected",
+      "status": "pass",
+      "seconds": 0.0328
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_owner_bypasses_automatic_cooldown_but_not_daily_cap",
+      "status": "pass",
+      "seconds": 0.0863
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_owner_request_delivers_attachment_and_guests_cannot_request_it",
+      "status": "pass",
+      "seconds": 0.0289
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_owner_request_respects_target_opt_out",
+      "status": "pass",
+      "seconds": 0.0278
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_persistent_preferences_and_attempt_cooldown_survive_restart",
+      "status": "pass",
+      "seconds": 0.1177
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_pings_opt_out_keeps_visible_tag_without_notification",
+      "status": "pass",
+      "seconds": 0.0283
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_provider_quota_error_redacts_details_and_backs_off",
+      "status": "pass",
+      "seconds": 0.0539
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_rejected_attachment_falls_back_without_fake_delivery_note",
+      "status": "pass",
+      "seconds": 0.033
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_unconfigured_disabled_and_opted_out_do_not_upload",
+      "status": "pass",
+      "seconds": 0.0353
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_untrusted_avatar_host_is_never_fetched",
+      "status": "pass",
+      "seconds": 0.0245
+    },
+    {
+      "test": "test_avatar_edits.AvatarEditTests.test_unusable_or_disallowed_owner_scene_never_reaches_cloudflare",
+      "status": "pass",
+      "seconds": 0.0189
+    },
+    {
+      "test": "test_avatar_edits.AvatarPreferenceAndIntentTests.test_only_literal_self_directed_statements_enable_edits",
+      "status": "pass",
+      "seconds": 0.0004
+    },
+    {
+      "test": "test_avatar_edits.AvatarPreferenceAndIntentTests.test_owner_avatar_intents_and_explanatory_question",
+      "status": "pass",
+      "seconds": 0.0005
+    },
+    {
+      "test": "test_avatar_edits.AvatarPreferenceAndIntentTests.test_requested_wording_and_other_custom_scenes",
+      "status": "pass",
+      "seconds": 0.0004
+    },
+    {
+      "test": "test_build_install.BuildInstallTests.test_dependency_conflicts_fail_the_build",
+      "status": "pass",
+      "seconds": 0.0004
+    },
+    {
+      "test": "test_build_install.BuildInstallTests.test_failed_index_fetch_retries_entire_install_command",
+      "status": "pass",
+      "seconds": 0.001
+    },
+    {
+      "test": "test_build_install.BuildInstallTests.test_nixpacks_install_uses_the_virtualenv_interpreter",
+      "status": "pass",
+      "seconds": 0.0009
+    },
+    {
+      "test": "test_build_install.BuildInstallTests.test_permanent_install_failure_preserves_failure_exit_code",
+      "status": "pass",
+      "seconds": 0.001
+    },
+    {
+      "test": "test_build_install.BuildInstallTests.test_pip_upgrade_failure_stops_before_installing_bot_dependencies",
+      "status": "pass",
+      "seconds": 0.0009
+    },
+    {
+      "test": "test_build_install.BuildInstallTests.test_success_upgrades_pip_installs_requirements_and_checks_environment",
+      "status": "pass",
+      "seconds": 0.0007
+    },
+    {
+      "test": "test_butler_dignity.ButlerDignityTests.test_discussion_and_normal_banter_are_not_blocked",
+      "status": "pass",
+      "seconds": 0.0013
+    },
+    {
+      "test": "test_butler_dignity.ButlerDignityTests.test_performance_requests",
+      "status": "pass",
+      "seconds": 0.0001
+    },
+    {
+      "test": "test_charm.CharmBoundaryTests.test_literal_self_directed_boundaries_and_reenabling",
+      "status": "pass",
+      "seconds": 0.0006
+    },
+    {
+      "test": "test_charm.CharmBoundaryTests.test_other_people_and_quoted_boundaries_do_not_change_preferences",
+      "status": "pass",
+      "seconds": 0.0008
+    },
+    {
+      "test": "test_charm.CharmBoundaryTests.test_quotes_definitions_third_party_affection_and_mixed_requests_are_not_fast_chat",
+      "status": "pass",
+      "seconds": 0.0002
+    },
+    {
+      "test": "test_charm.CharmTests.test_concurrent_turns_only_reserve_one_server_opportunity",
+      "status": "pass",
+      "seconds": 0.0874
+    },
+    {
+      "test": "test_charm.CharmTests.test_context_loads_saved_dm_boundary_without_intro",
+      "status": "pass",
+      "seconds": 0.0398
+    },
+    {
+      "test": "test_charm.CharmTests.test_cooldowns_and_boundaries_survive_database_reopen",
+      "status": "pass",
+      "seconds": 0.1096
+    },
+    {
+      "test": "test_charm.CharmTests.test_current_member_can_disable_flirting_or_introductions",
+      "status": "pass",
+      "seconds": 0.0254
+    },
+    {
+      "test": "test_charm.CharmTests.test_disabled_flirting_and_introductions_override_an_opportunity",
+      "status": "pass",
+      "seconds": 0.0328
+    },
+    {
+      "test": "test_charm.CharmTests.test_dm_private_channel_owner_absence_and_quiet_hours_are_excluded",
+      "status": "pass",
+      "seconds": 0.031
+    },
+    {
+      "test": "test_charm.CharmTests.test_flirting_does_not_swallow_identity_challenges",
+      "status": "pass",
+      "seconds": 0.0294
+    },
+    {
+      "test": "test_charm.CharmTests.test_flirty_banter_skips_classification_and_fact_extraction",
+      "status": "pass",
+      "seconds": 0.0295
+    },
+    {
+      "test": "test_charm.CharmTests.test_invalid_member_cooldown_fails_closed",
+      "status": "pass",
+      "seconds": 0.0392
+    },
+    {
+      "test": "test_charm.CharmTests.test_member_stays_on_cooldown_after_server_limit_expires",
+      "status": "pass",
+      "seconds": 0.0612
+    },
+    {
+      "test": "test_charm.CharmTests.test_migration_preserves_old_disabled_preferences",
+      "status": "pass",
+      "seconds": 0.1069
+    },
+    {
+      "test": "test_charm.CharmTests.test_no_intro_for_unknown_neutral_negative_or_stale_impressions",
+      "status": "pass",
+      "seconds": 0.0552
+    },
+    {
+      "test": "test_charm.CharmTests.test_one_percent_roll_only_grants_an_optional_opportunity",
+      "status": "pass",
+      "seconds": 0.0569
+    },
+    {
+      "test": "test_charm.CharmTests.test_opt_out_is_scoped_to_the_actual_speaker_and_server",
+      "status": "pass",
+      "seconds": 0.0499
+    },
+    {
+      "test": "test_charm.CharmTests.test_owner_bots_and_away_replies_do_not_get_opportunities",
+      "status": "pass",
+      "seconds": 0.0201
+    },
+    {
+      "test": "test_charm.CharmTests.test_owner_can_disable_unsolicited_setups",
+      "status": "pass",
+      "seconds": 0.0266
+    },
+    {
+      "test": "test_charm.CharmTests.test_real_chat_saves_dm_opt_out_and_supplies_charm_context",
+      "status": "pass",
+      "seconds": 0.0734
+    },
+    {
+      "test": "test_charm.CharmTests.test_real_public_chat_supplies_the_reserved_opportunity_to_generation",
+      "status": "pass",
+      "seconds": 0.0773
+    },
+    {
+      "test": "test_charm.CharmTests.test_serious_negative_greetings_and_help_turns_do_not_get_intro_opportunities",
+      "status": "pass",
+      "seconds": 0.0211
+    },
+    {
+      "test": "test_charm.CharmTests.test_server_limit_applies_across_members_and_channels",
+      "status": "pass",
+      "seconds": 0.0571
+    },
+    {
+      "test": "test_charm.CharmTests.test_style_context_distinguishes_teasing_from_rejection_and_no_intro_by_default",
+      "status": "pass",
+      "seconds": 0.0203
+    },
+    {
+      "test": "test_chat_latency.FastRoutingTests.test_fast_chat_cannot_swallow_a_request_or_identity_challenge",
+      "status": "pass",
+      "seconds": 0.0028
+    },
+    {
+      "test": "test_chat_latency.FastRoutingTests.test_self_reports_skip_review_only_after_boundary_and_request_checks",
+      "status": "pass",
+      "seconds": 0.0037
+    },
+    {
+      "test": "test_chat_latency.FastRoutingTests.test_simple_chatter_skips_classifiers_but_not_reply_generation",
+      "status": "pass",
+      "seconds": 0.0025
+    },
+    {
+      "test": "test_chat_latency.ReplyLatencyTests.test_failed_text_delivery_cancels_pending_media",
+      "status": "pass",
+      "seconds": 0.1961
+    },
+    {
+      "test": "test_chat_latency.ReplyLatencyTests.test_member_can_opt_out_while_media_is_waiting",
+      "status": "pass",
+      "seconds": 0.1855
+    },
+    {
+      "test": "test_chat_latency.ReplyLatencyTests.test_owner_hello_also_needs_only_one_model_call",
+      "status": "pass",
+      "seconds": 0.0189
+    },
+    {
+      "test": "test_chat_latency.ReplyLatencyTests.test_prompt_answers_the_question_and_preserves_the_original_context",
+      "status": "pass",
+      "seconds": 0.0131
+    },
+    {
+      "test": "test_chat_latency.ReplyLatencyTests.test_rejected_edit_preserves_text_and_never_reports_the_error",
+      "status": "pass",
+      "seconds": 0.1825
+    },
+    {
+      "test": "test_chat_latency.ReplyLatencyTests.test_serious_reply_does_not_offer_entertainment",
+      "status": "pass",
+      "seconds": 0.0297
+    },
+    {
+      "test": "test_chat_latency.ReplyLatencyTests.test_slow_avatar_does_not_block_a_protected_request_refusal",
+      "status": "pass",
+      "seconds": 0.1898
+    },
+    {
+      "test": "test_chat_latency.ReplyLatencyTests.test_slow_gif_does_not_delay_text_and_edits_same_reply_afterwards",
+      "status": "pass",
+      "seconds": 0.2028
+    },
+    {
+      "test": "test_companion.CompanionTests.test_away_reply_cooldown_survives_state",
+      "status": "pass",
+      "seconds": 0.0261
+    },
+    {
+      "test": "test_companion.CompanionTests.test_boundary_requests_are_not_guest_errands",
+      "status": "pass",
+      "seconds": 0.0223
+    },
+    {
+      "test": "test_companion.CompanionTests.test_cancelled_summary_cannot_repopulate_reset_channel",
+      "status": "pass",
+      "seconds": 0.0366
+    },
+    {
+      "test": "test_companion.CompanionTests.test_context_attributes_other_bots_and_includes_current_message_once",
+      "status": "pass",
+      "seconds": 0.0597
+    },
+    {
+      "test": "test_companion.CompanionTests.test_database_initialization_is_singleton_under_concurrent_calls",
+      "status": "pass",
+      "seconds": 0.0419
+    },
+    {
+      "test": "test_companion.CompanionTests.test_direct_address_takes_priority_over_owner_mention",
+      "status": "pass",
+      "seconds": 0.0244
+    },
+    {
+      "test": "test_companion.CompanionTests.test_explanations_and_game_discussions_are_not_errands",
+      "status": "pass",
+      "seconds": 0.0188
+    },
+    {
+      "test": "test_companion.CompanionTests.test_failing_summary_does_not_destroy_recent_memory",
+      "status": "pass",
+      "seconds": 0.0243
+    },
+    {
+      "test": "test_companion.CompanionTests.test_followups_are_same_person_short_window_and_bounded",
+      "status": "pass",
+      "seconds": 0.0146
+    },
+    {
+      "test": "test_companion.CompanionTests.test_history_is_bounded_by_character_budget",
+      "status": "pass",
+      "seconds": 0.0518
+    },
+    {
+      "test": "test_companion.CompanionTests.test_member_boundaries_are_id_scoped_and_persist",
+      "status": "pass",
+      "seconds": 0.0943
+    },
+    {
+      "test": "test_companion.CompanionTests.test_missing_credentials_are_reported_without_disclosing_values",
+      "status": "pass",
+      "seconds": 0.0169
+    },
+    {
+      "test": "test_companion.CompanionTests.test_owner_notes_are_not_disclosed_to_guests",
+      "status": "pass",
+      "seconds": 0.0359
+    },
+    {
+      "test": "test_companion.CompanionTests.test_quiet_hours_cross_midnight_and_invalid_settings_fail_closed",
+      "status": "pass",
+      "seconds": 0.0249
+    },
+    {
+      "test": "test_companion.CompanionTests.test_repeat_guard_regenerates_once_and_rejects_recycled_result",
+      "status": "pass",
+      "seconds": 0.0283
+    },
+    {
+      "test": "test_companion.CompanionTests.test_setup_hook_registers_extensions_before_gateway_events",
+      "status": "pass",
+      "seconds": 0.0311
+    },
+    {
+      "test": "test_companion.CompanionTests.test_shared_autonomous_gap_is_persistent",
+      "status": "pass",
+      "seconds": 0.0303
+    },
+    {
+      "test": "test_companion.CompanionTests.test_single_eligible_member_still_gets_old_style_ping",
+      "status": "pass",
+      "seconds": 0.0363
+    },
+    {
+      "test": "test_companion.CompanionTests.test_slow_summary_does_not_hold_the_conversation_lock",
+      "status": "pass",
+      "seconds": 0.0436
+    },
+    {
+      "test": "test_companion.CompanionTests.test_stale_summary_version_cannot_restore_cleared_memory",
+      "status": "pass",
+      "seconds": 0.0308
+    },
+    {
+      "test": "test_companion.CompanionTests.test_targets_respect_opt_outs_and_vary_when_possible",
+      "status": "pass",
+      "seconds": 0.0346
+    },
+    {
+      "test": "test_companion.CompanionTests.test_unknown_owner_presence_does_not_trigger_away_claim",
+      "status": "pass",
+      "seconds": 0.0232
+    },
+    {
+      "test": "test_companion.CompanionTests.test_useful_explanations_are_not_rewritten_just_for_novelty",
+      "status": "pass",
+      "seconds": 0.0287
+    },
+    {
+      "test": "test_companion.LlmReliabilityTests.test_cloud_json_parser_accepts_fences_but_not_invalid_output",
+      "status": "pass",
+      "seconds": 0.0031
+    },
+    {
+      "test": "test_companion.LlmReliabilityTests.test_speaker_envelopes_are_not_delivered_to_discord",
+      "status": "pass",
+      "seconds": 0.0045
+    },
+    {
+      "test": "test_companion.LlmReliabilityTests.test_thinking_is_model_specific_and_empty_response_retries_once",
+      "status": "pass",
+      "seconds": 0.005
+    },
+    {
+      "test": "test_companion.LlmReliabilityTests.test_timeout_is_bounded_and_does_not_expose_provider_error",
+      "status": "pass",
+      "seconds": 0.0228
+    },
+    {
+      "test": "test_context_window.ContextUsageLoggingTests.test_usage_logs_counts_without_logging_private_prompt_text",
+      "status": "pass",
+      "seconds": 0.0048
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_greetings_remain_compact_and_current_input_is_not_duplicated",
+      "status": "pass",
+      "seconds": 0.2071
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_important_older_detail_is_not_crowded_out_by_long_recent_posts",
+      "status": "pass",
+      "seconds": 0.1203
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_long_message_preserves_its_end_and_fits_the_serialized_budget",
+      "status": "pass",
+      "seconds": 0.0453
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_member_reply_is_pinned_with_its_author_and_embed_context",
+      "status": "pass",
+      "seconds": 0.0427
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_other_channels_and_servers_are_never_used_for_reply_context",
+      "status": "pass",
+      "seconds": 0.0643
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_recall_uses_up_to_100_messages_and_keeps_chronological_order",
+      "status": "pass",
+      "seconds": 0.3291
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_relevance_checks_more_than_the_first_ten_words_of_old_messages",
+      "status": "pass",
+      "seconds": 0.1544
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_relevant_older_exchange_survives_a_busy_channel",
+      "status": "pass",
+      "seconds": 0.2509
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_returning_speaker_keeps_their_earlier_exchange",
+      "status": "pass",
+      "seconds": 0.1443
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_summary_keeps_specifics_and_speaker_ids_in_one_background_call",
+      "status": "pass",
+      "seconds": 0.026
+    },
+    {
+      "test": "test_context_window.ContextWindowTests.test_summary_reply_anchor_and_history_share_the_budget",
+      "status": "pass",
+      "seconds": 0.0391
+    },
+    {
+      "test": "test_dead_chat.DeadChatQuietHoursTests.test_blank_setting_disables_dead_chat_window",
+      "status": "pass",
+      "seconds": 0.0002
+    },
+    {
+      "test": "test_dead_chat.DeadChatQuietHoursTests.test_dead_chat_window_does_not_enable_global_quiet_hours",
+      "status": "pass",
+      "seconds": 0.0001
+    },
+    {
+      "test": "test_dead_chat.DeadChatQuietHoursTests.test_midnight_is_inclusive_and_eight_am_is_exclusive",
+      "status": "pass",
+      "seconds": 0.0002
+    },
+    {
+      "test": "test_dead_chat.DeadChatQuietHoursTests.test_utc_clock_is_converted_to_server_timezone",
+      "status": "pass",
+      "seconds": 0.0002
+    },
+    {
+      "test": "test_dead_chat.DeadChatTests.test_bot_activity_moves_timer_without_resetting_sequence",
+      "status": "pass",
+      "seconds": 0.0845
+    },
+    {
+      "test": "test_dead_chat.DeadChatTests.test_dead_chat_uses_roast_ping_never_an_automatic_game",
+      "status": "pass",
+      "seconds": 0.1032
+    },
+    {
+      "test": "test_dead_chat.DeadChatTests.test_doubling_persistence_and_human_reset",
+      "status": "pass",
+      "seconds": 0.094
+    },
+    {
+      "test": "test_dead_chat.DeadChatTests.test_five_ping_cap_survives_restart_and_human_resets",
+      "status": "pass",
+      "seconds": 0.1045
+    },
+    {
+      "test": "test_dead_chat.DeadChatTests.test_generated_line_retries_examples_and_strips_extra_pings",
+      "status": "pass",
+      "seconds": 0.0564
+    },
+    {
+      "test": "test_dead_chat.DeadChatTests.test_generation_crossing_midnight_does_not_ping",
+      "status": "pass",
+      "seconds": 0.0845
+    },
+    {
+      "test": "test_dead_chat.DeadChatTests.test_quiet_hours_skip_work_and_preserve_ping_counter",
+      "status": "pass",
+      "seconds": 0.0631
+    },
+    {
+      "test": "test_dead_chat.DeadChatTests.test_scheduler_sends_only_when_next_interval_expires",
+      "status": "pass",
+      "seconds": 0.1654
+    },
+    {
+      "test": "test_dead_chat_cleanup.DeadChatCleanupTests.test_already_deleted_message_is_removed_from_queue",
+      "status": "pass",
+      "seconds": 0.0647
+    },
+    {
+      "test": "test_dead_chat_cleanup.DeadChatCleanupTests.test_cleanup_works_in_bounded_batches",
+      "status": "pass",
+      "seconds": 0.1836
+    },
+    {
+      "test": "test_dead_chat_cleanup.DeadChatCleanupTests.test_deletes_at_24_hours_not_before_and_leaves_other_messages_alone",
+      "status": "pass",
+      "seconds": 0.0626
+    },
+    {
+      "test": "test_dead_chat_cleanup.DeadChatCleanupTests.test_duplicate_registration_does_not_extend_expiry",
+      "status": "pass",
+      "seconds": 0.0456
+    },
+    {
+      "test": "test_dead_chat_cleanup.DeadChatCleanupTests.test_housekeeping_cleans_even_when_pings_disabled_and_quiet",
+      "status": "pass",
+      "seconds": 0.0589
+    },
+    {
+      "test": "test_dead_chat_cleanup.DeadChatCleanupTests.test_http_errors_retry_with_backoff_and_survive_restart",
+      "status": "pass",
+      "seconds": 0.1622
+    },
+    {
+      "test": "test_dead_chat_cleanup.DeadChatCleanupTests.test_one_failed_delete_does_not_block_other_messages",
+      "status": "pass",
+      "seconds": 0.0631
+    },
+    {
+      "test": "test_dead_chat_cleanup.DeadChatCleanupTests.test_pending_cleanup_survives_restart_and_memory_reset",
+      "status": "pass",
+      "seconds": 0.0565
+    },
+    {
+      "test": "test_dead_chat_cleanup.DeadChatCleanupTests.test_real_nudge_path_schedules_exactly_one_day_after_creation",
+      "status": "pass",
+      "seconds": 0.0654
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_failed_priority_roll_rotates_other_members",
+      "status": "pass",
+      "seconds": 0.0376
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_opt_out_during_generation_prevents_delivery",
+      "status": "pass",
+      "seconds": 0.0338
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_other_members_keep_the_normal_roast_prompt",
+      "status": "pass",
+      "seconds": 0.0492
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_preferred_delivery_gets_savage_prompt_and_exactly_one_ping",
+      "status": "pass",
+      "seconds": 0.0738
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_preferred_member_can_be_selected_again",
+      "status": "pass",
+      "seconds": 0.0203
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_preferred_member_can_stop_pings_or_roasting",
+      "status": "pass",
+      "seconds": 0.0328
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_preferred_member_must_be_present_and_not_owner_or_bot",
+      "status": "pass",
+      "seconds": 0.0255
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_shared_two_minute_cooldown_does_not_override_one_minute_dead_chat",
+      "status": "pass",
+      "seconds": 0.0515
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_single_eligible_preferred_member_is_still_usable",
+      "status": "pass",
+      "seconds": 0.0524
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_two_in_a_row_then_rotation_survives_restart",
+      "status": "pass",
+      "seconds": 0.1013
+    },
+    {
+      "test": "test_dead_chat_priority.PreferredDeadChatTests.test_zero_probability_keeps_normal_random_rotation",
+      "status": "pass",
+      "seconds": 0.0269
+    },
+    {
+      "test": "test_dead_chat_priority.SavagePromptTests.test_normal_style_does_not_claim_the_member_requested_savage_roasts",
+      "status": "pass",
+      "seconds": 0.0056
+    },
+    {
+      "test": "test_dead_chat_priority.SavagePromptTests.test_savage_style_is_generated_and_does_not_pass_target_identity_to_model",
+      "status": "pass",
+      "seconds": 0.0063
+    },
+    {
+      "test": "test_discreet_replies.DiscreetActionTests.test_avatar_configuration_is_not_announced_in_public",
+      "status": "pass",
+      "seconds": 0.0259
+    },
+    {
+      "test": "test_discreet_replies.DiscreetActionTests.test_disabled_paid_gif_generation_never_discloses_setup_or_calls_provider",
+      "status": "pass",
+      "seconds": 0.0035
+    },
+    {
+      "test": "test_discreet_replies.DiscreetActionTests.test_empty_media_results_get_generated_replies_not_error_strings",
+      "status": "pass",
+      "seconds": 0.0642
+    },
+    {
+      "test": "test_discreet_replies.DiscreetActionTests.test_empty_searches_do_not_publish_setup_messages_or_invent_facts",
+      "status": "pass",
+      "seconds": 0.0058
+    },
+    {
+      "test": "test_discreet_replies.DiscreetActionTests.test_missing_action_uses_a_natural_reply_without_fetching",
+      "status": "pass",
+      "seconds": 0.0059
+    },
+    {
+      "test": "test_discreet_replies.DiscreetActionTests.test_no_mention_and_dm_requests_still_deliver_a_gif_without_tags",
+      "status": "pass",
+      "seconds": 0.0062
+    },
+    {
+      "test": "test_discreet_replies.DiscreetActionTests.test_provider_exception_is_logged_without_exposing_its_body",
+      "status": "pass",
+      "seconds": 0.0065
+    },
+    {
+      "test": "test_discreet_replies.DiscreetActionTests.test_target_preferences_remain_private_and_are_not_bypassed",
+      "status": "pass",
+      "seconds": 0.034
+    },
+    {
+      "test": "test_discreet_replies.DiscreetActionTests.test_unresolved_target_does_not_invent_a_ping_or_request_another_mention",
+      "status": "pass",
+      "seconds": 0.0069
+    },
+    {
+      "test": "test_discreet_replies.DiscreetReplyTests.test_diagnostic_or_fake_delivery_drafts_are_not_published",
+      "status": "pass",
+      "seconds": 0.0219
+    },
+    {
+      "test": "test_discreet_replies.DiscreetReplyTests.test_llm_default_failure_is_not_a_public_error_announcement",
+      "status": "pass",
+      "seconds": 0.0054
+    },
+    {
+      "test": "test_discreet_replies.DiscreetReplyTests.test_model_outage_has_a_nontechnical_last_resort",
+      "status": "pass",
+      "seconds": 0.0068
+    },
+    {
+      "test": "test_discreet_replies.DiscreetReplyTests.test_replies_are_fresh_and_owner_context_is_trusted",
+      "status": "pass",
+      "seconds": 0.0059
+    },
+    {
+      "test": "test_discreet_replies.DiscreetReplyTests.test_reply_cannot_include_unwanted_links_or_mentions",
+      "status": "pass",
+      "seconds": 0.0053
+    },
+    {
+      "test": "test_emoji_filter.EmojiFilterTests.test_existing_tags_remain_intact",
+      "status": "pass",
+      "seconds": 0.0042
+    },
+    {
+      "test": "test_emoji_filter.EmojiFilterTests.test_no_guild_does_not_leave_ids",
+      "status": "pass",
+      "seconds": 0.004
+    },
+    {
+      "test": "test_emoji_filter.EmojiFilterTests.test_short_names_convert_once",
+      "status": "pass",
+      "seconds": 0.004
+    },
+    {
+      "test": "test_emoji_filter.EmojiFilterTests.test_unknown_id_removed_without_trailing_digits",
+      "status": "pass",
+      "seconds": 0.0046
+    },
+    {
+      "test": "test_evaluation_regressions.ComfortRegressionTests.test_disabled_flirting_does_not_also_supply_positive_instructions",
+      "status": "pass",
+      "seconds": 0.0001
+    },
+    {
+      "test": "test_evaluation_regressions.ComfortRegressionTests.test_english_and_hinglish_opt_outs",
+      "status": "pass",
+      "seconds": 0.0007
+    },
+    {
+      "test": "test_evaluation_regressions.ComfortRegressionTests.test_only_direct_self_boundaries_change_settings",
+      "status": "pass",
+      "seconds": 0.0005
+    },
+    {
+      "test": "test_evaluation_regressions.ComfortRegressionTests.test_reenable_is_explicit_not_inferred_from_affection",
+      "status": "pass",
+      "seconds": 0.0003
+    },
+    {
+      "test": "test_evaluation_regressions.DeliveryRegressionTests.test_all_seven_deliveries_enter_real_recent_memory_once",
+      "status": "pass",
+      "seconds": 0.1068
+    },
+    {
+      "test": "test_evaluation_regressions.DeliveryRegressionTests.test_failed_discord_send_is_not_logged_as_success",
+      "status": "pass",
+      "seconds": 0.032
+    },
+    {
+      "test": "test_evaluation_regressions.DeliveryRegressionTests.test_failed_memory_write_after_delivery_does_not_send_again",
+      "status": "pass",
+      "seconds": 0.0084
+    },
+    {
+      "test": "test_evaluation_regressions.MoodRegressionTests.test_exact_titles_still_work_and_unknown_language_is_not_invented",
+      "status": "pass",
+      "seconds": 0.0351
+    },
+    {
+      "test": "test_evaluation_regressions.MoodRegressionTests.test_explicit_mood_request_can_replay_its_only_matching_track",
+      "status": "pass",
+      "seconds": 0.04
+    },
+    {
+      "test": "test_evaluation_regressions.MoodRegressionTests.test_mood_is_metadata_not_a_word_in_the_title",
+      "status": "pass",
+      "seconds": 0.0496
+    },
+    {
+      "test": "test_evaluation_regressions.MoodRegressionTests.test_sidecar_tags_only_augment_real_ids_and_preserve_explicit_metadata",
+      "status": "pass",
+      "seconds": 0.0113
+    },
+    {
+      "test": "test_evaluation_regressions.ReplyQualityRegressionTests.test_failed_boundary_rewrite_is_never_delivered_as_flirting",
+      "status": "pass",
+      "seconds": 0.0055
+    },
+    {
+      "test": "test_evaluation_regressions.ReplyQualityRegressionTests.test_format_and_care_guidance_use_the_existing_single_reply_call",
+      "status": "pass",
+      "seconds": 0.0059
+    },
+    {
+      "test": "test_evaluation_regressions.ReplyQualityRegressionTests.test_visible_defects_get_one_small_rewrite_not_another_full_chat",
+      "status": "pass",
+      "seconds": 0.0075
+    },
+    {
+      "test": "test_evaluation_regressions.RoutingRegressionTests.test_clear_replacement_ignores_the_negated_action_and_its_mentions",
+      "status": "pass",
+      "seconds": 0.0057
+    },
+    {
+      "test": "test_evaluation_regressions.RoutingRegressionTests.test_negated_and_informational_requests_never_reach_semantic_tools",
+      "status": "pass",
+      "seconds": 0.0062
+    },
+    {
+      "test": "test_evaluation_regressions.RoutingRegressionTests.test_polite_positive_requests_and_negative_song_titles_still_work",
+      "status": "pass",
+      "seconds": 0.0062
+    },
+    {
+      "test": "test_evaluation_regressions.SourceRegressionTests.test_invalid_source_destinations_are_not_rendered",
+      "status": "pass",
+      "seconds": 0.0053
+    },
+    {
+      "test": "test_evaluation_regressions.SourceRegressionTests.test_links_stay_within_discord_size_and_empty_summaries_stay_empty",
+      "status": "pass",
+      "seconds": 0.0083
+    },
+    {
+      "test": "test_evaluation_regressions.SourceRegressionTests.test_requested_links_are_real_results_not_model_destinations",
+      "status": "pass",
+      "seconds": 0.0053
+    },
+    {
+      "test": "test_evaluation_regressions.SourceRegressionTests.test_unrequested_links_and_markers_are_removed",
+      "status": "pass",
+      "seconds": 0.0056
+    },
+    {
+      "test": "test_gif_variety.GifVarietyTests.test_empty_search_regenerates_queries_using_sentiment_and_reply",
+      "status": "pass",
+      "seconds": 0.0614
+    },
+    {
+      "test": "test_gif_variety.GifVarietyTests.test_owner_request_still_uses_first_result_without_pagination",
+      "status": "pass",
+      "seconds": 0.0585
+    },
+    {
+      "test": "test_gif_variety.GifVarietyTests.test_ranked_search_skips_seen_ids_and_survives_restart",
+      "status": "pass",
+      "seconds": 0.1174
+    },
+    {
+      "test": "test_gif_variety.GifVarietyTests.test_search_continues_after_exhausted_first_page",
+      "status": "pass",
+      "seconds": 0.073
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_bad_guest_classification_cannot_grant_owner_tools",
+      "status": "pass",
+      "seconds": 0.0423
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_both_executor_entry_points_reject_guest_owner_only_intents",
+      "status": "pass",
+      "seconds": 0.008
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_failed_semantic_review_does_not_default_to_allowed",
+      "status": "pass",
+      "seconds": 0.0085
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_guest_can_search_and_request_news",
+      "status": "pass",
+      "seconds": 0.0398
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_guest_game_request_routes_to_activities",
+      "status": "pass",
+      "seconds": 0.0399
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_guest_media_requests_reach_real_executor_and_embed",
+      "status": "pass",
+      "seconds": 0.0578
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_guest_tool_cooldown_is_shared_across_channels_but_not_servers",
+      "status": "pass",
+      "seconds": 0.0579
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_guest_writing_and_translation_continue_to_chat",
+      "status": "pass",
+      "seconds": 0.04
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_owner_and_guests_can_request_real_playlist_songs",
+      "status": "pass",
+      "seconds": 0.0469
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_owner_never_uses_guest_classifier",
+      "status": "pass",
+      "seconds": 0.0296
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_protected_requests_never_reach_intent_or_tools",
+      "status": "pass",
+      "seconds": 0.0455
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_semantic_review_distinguishes_identity_questions_and_poems_from_takeovers",
+      "status": "pass",
+      "seconds": 0.0092
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_targeted_guest_gif_cannot_forge_an_unmentioned_target",
+      "status": "pass",
+      "seconds": 0.0133
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_targeted_guest_gif_respects_opt_outs_and_never_mass_pings",
+      "status": "pass",
+      "seconds": 0.0374
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_tool_cooldown_does_not_block_other_members_or_owner",
+      "status": "pass",
+      "seconds": 0.0483
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_tool_cooldown_does_not_prevent_writing",
+      "status": "pass",
+      "seconds": 0.0396
+    },
+    {
+      "test": "test_guest_requests.GuestRequestTests.test_unaddressed_guest_requests_do_not_trigger_the_bot",
+      "status": "pass",
+      "seconds": 0.007
+    },
+    {
+      "test": "test_housekeeping.HousekeepingTests.test_cleanup_failure_does_not_stop_scheduled_posts",
+      "status": "pass",
+      "seconds": 0.0068
+    },
+    {
+      "test": "test_housekeeping.HousekeepingTests.test_empty_news_is_not_sent_as_a_public_status_message",
+      "status": "pass",
+      "seconds": 0.0069
+    },
+    {
+      "test": "test_housekeeping.HousekeepingTests.test_news_catches_up_and_deduplicates",
+      "status": "pass",
+      "seconds": 0.0081
+    },
+    {
+      "test": "test_housekeeping.HousekeepingTests.test_news_failure_does_not_stop_dead_chat",
+      "status": "pass",
+      "seconds": 0.0064
+    },
+    {
+      "test": "test_imgflip.CaptionedGifIntentTests.test_natural_requests_are_distinct_from_plain_gif_searches",
+      "status": "pass",
+      "seconds": 0.0008
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_api_rejection_in_http_200_is_not_reported_as_an_image",
+      "status": "pass",
+      "seconds": 0.0256
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_automatic_gif_captioning_requires_explicit_enablement",
+      "status": "pass",
+      "seconds": 0.0228
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_caption_duplicates_are_skipped_before_another_render",
+      "status": "pass",
+      "seconds": 0.0634
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_caption_failure_falls_back_without_logging_secrets",
+      "status": "pass",
+      "seconds": 0.0495
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_captioned_gif_delivery_is_an_embed_not_a_text_url",
+      "status": "pass",
+      "seconds": 0.0256
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_captioned_gif_requests_remain_owner_only",
+      "status": "pass",
+      "seconds": 0.0258
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_concurrent_paid_calls_cannot_bypass_daily_cap",
+      "status": "pass",
+      "seconds": 0.0339
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_enabled_captioned_gif_uses_animated_endpoint_and_reserves_budget",
+      "status": "pass",
+      "seconds": 0.0569
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_gif_opt_in_required_even_for_internal_generation",
+      "status": "pass",
+      "seconds": 0.0235
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_invalid_image_hosts_and_redirects_are_rejected",
+      "status": "pass",
+      "seconds": 0.0232
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_legacy_memegen_caption_history_blocks_imgflip_reruns",
+      "status": "pass",
+      "seconds": 0.0454
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_non_latin_or_mention_captions_never_reach_renderer",
+      "status": "pass",
+      "seconds": 0.032
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_paid_attempt_limit_survives_restart_including_failures",
+      "status": "pass",
+      "seconds": 0.0986
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_repeated_image_bytes_are_rejected_despite_new_captions_and_urls",
+      "status": "pass",
+      "seconds": 0.0633
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_static_bytes_are_not_delivered_as_an_animated_gif",
+      "status": "pass",
+      "seconds": 0.0566
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_static_meme_uses_bearer_form_boxes_and_embed_url",
+      "status": "pass",
+      "seconds": 0.0384
+    },
+    {
+      "test": "test_imgflip.ImgflipTests.test_template_catalog_is_cached_and_safe_mode_filters_unknown_ids",
+      "status": "pass",
+      "seconds": 0.0234
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_assamese_cues_are_turn_specific_and_do_not_override_an_explicit_language",
+      "status": "pass",
+      "seconds": 0.0041
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_code_does_not_count_as_a_request_to_switch_speech_scripts",
+      "status": "pass",
+      "seconds": 0.0041
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_default_policy_is_hinglish_but_clear_member_languages_take_priority",
+      "status": "pass",
+      "seconds": 0.0039
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_discreet_asides_allow_the_actual_members_native_script",
+      "status": "pass",
+      "seconds": 0.0066
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_english_requests_for_a_native_language_allow_native_output",
+      "status": "pass",
+      "seconds": 0.0067
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_existing_owner_and_guest_authority_policy_is_unchanged",
+      "status": "pass",
+      "seconds": 0.0415
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_last_explicit_translation_target_is_respected",
+      "status": "pass",
+      "seconds": 0.0047
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_metadata_does_not_override_explicit_empty_language_source",
+      "status": "pass",
+      "seconds": 0.0042
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_native_marathi_and_assamese_are_not_repaired_away",
+      "status": "pass",
+      "seconds": 0.0051
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_native_search_snippets_do_not_make_an_english_request_native",
+      "status": "pass",
+      "seconds": 0.0054
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_older_members_native_text_does_not_change_the_current_member",
+      "status": "pass",
+      "seconds": 0.0054
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_roman_marathi_cues_request_marathi_not_hindi_or_native_script",
+      "status": "pass",
+      "seconds": 0.0047
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_roman_script_request_overrides_native_source_and_target_language",
+      "status": "pass",
+      "seconds": 0.0036
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_romanized_marathi_stays_marathi_during_script_repair",
+      "status": "pass",
+      "seconds": 0.0052
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_script_repair_transforms_the_draft_not_the_users_question",
+      "status": "pass",
+      "seconds": 0.0065
+    },
+    {
+      "test": "test_language_style.MultilingualResponseTests.test_search_result_language_cannot_override_the_original_member",
+      "status": "pass",
+      "seconds": 0.0047
+    },
+    {
+      "test": "test_language_style.ScriptDetectionTests.test_code_urls_and_delimited_math_are_not_conversational_prose",
+      "status": "pass",
+      "seconds": 0.0003
+    },
+    {
+      "test": "test_language_style.ScriptDetectionTests.test_latin_languages_accents_and_emoji_are_allowed",
+      "status": "pass",
+      "seconds": 0.0003
+    },
+    {
+      "test": "test_language_style.ScriptDetectionTests.test_non_latin_speech_after_code_is_still_detected",
+      "status": "pass",
+      "seconds": 0.0001
+    },
+    {
+      "test": "test_language_style.ScriptDetectionTests.test_non_latin_speech_is_detected_even_in_a_mixed_reply",
+      "status": "pass",
+      "seconds": 0.0002
+    },
+    {
+      "test": "test_language_style.VisibleResponseTests.test_context_without_final_user_still_gets_policy",
+      "status": "pass",
+      "seconds": 0.005
+    },
+    {
+      "test": "test_language_style.VisibleResponseTests.test_dead_chat_nudges_use_the_same_script_repair",
+      "status": "pass",
+      "seconds": 0.0049
+    },
+    {
+      "test": "test_language_style.VisibleResponseTests.test_failed_repair_suppresses_non_latin_draft_and_stops",
+      "status": "pass",
+      "seconds": 0.005
+    },
+    {
+      "test": "test_language_style.VisibleResponseTests.test_failed_repair_uses_plain_english_when_fallback_is_needed",
+      "status": "pass",
+      "seconds": 0.0039
+    },
+    {
+      "test": "test_language_style.VisibleResponseTests.test_guest_refusal_uses_the_same_script_repair",
+      "status": "pass",
+      "seconds": 0.0048
+    },
+    {
+      "test": "test_language_style.VisibleResponseTests.test_internal_json_is_not_rewritten_or_given_speech_instructions",
+      "status": "pass",
+      "seconds": 0.0044
+    },
+    {
+      "test": "test_language_style.VisibleResponseTests.test_policy_is_added_near_current_message_without_mutating_context",
+      "status": "pass",
+      "seconds": 0.004
+    },
+    {
+      "test": "test_language_style.VisibleResponseTests.test_script_slip_gets_one_meaning_preserving_rewrite",
+      "status": "pass",
+      "seconds": 0.0041
+    },
+    {
+      "test": "test_language_style.VisibleResponseTests.test_search_summaries_use_the_same_script_repair",
+      "status": "pass",
+      "seconds": 0.0048
+    },
+    {
+      "test": "test_language_style.VisibleResponseTests.test_valid_code_and_emoji_do_not_add_another_model_call",
+      "status": "pass",
+      "seconds": 0.0043
+    },
+    {
+      "test": "test_live_behavior_regressions.DeadChatStarvationTests.test_default_priority_is_majority_of_five_with_rotation_not_random_luck",
+      "status": "pass",
+      "seconds": 0.0934
+    },
+    {
+      "test": "test_live_behavior_regressions.DeadChatStarvationTests.test_five_ping_cap_and_member_opt_out_are_preserved",
+      "status": "pass",
+      "seconds": 0.049
+    },
+    {
+      "test": "test_live_behavior_regressions.DeadChatStarvationTests.test_followup_waits_two_minutes_from_nudge_not_latest_other_bot_post",
+      "status": "pass",
+      "seconds": 0.0804
+    },
+    {
+      "test": "test_live_behavior_regressions.DeadChatStarvationTests.test_frequent_bot_posts_do_not_postpone_first_one_minute_nudge",
+      "status": "pass",
+      "seconds": 0.0712
+    },
+    {
+      "test": "test_live_behavior_regressions.DeadChatStarvationTests.test_human_activity_during_generation_cancels_stale_ping",
+      "status": "pass",
+      "seconds": 0.0568
+    },
+    {
+      "test": "test_live_behavior_regressions.DeadChatStarvationTests.test_human_message_still_resets_timer_and_campaign",
+      "status": "pass",
+      "seconds": 0.0413
+    },
+    {
+      "test": "test_live_behavior_regressions.DeploymentPriorityDefaultsTests.test_missing_or_blank_variables_keep_requested_priority_and_explicit_zero_disables_it",
+      "status": "pass",
+      "seconds": 0.01
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_actual_chat_handler_sends_and_saves_only_the_corrected_reply",
+      "status": "pass",
+      "seconds": 0.0598
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_ambiguous_bystander_alias_is_not_guessed",
+      "status": "pass",
+      "seconds": 0.0029
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_duplicate_display_name_resolves_to_current_actual_sender",
+      "status": "pass",
+      "seconds": 0.005
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_failed_or_still_misdirected_rewrite_never_posts_the_stale_answer",
+      "status": "pass",
+      "seconds": 0.0048
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_guest_after_owner_is_not_addressed_as_ronix",
+      "status": "pass",
+      "seconds": 0.0064
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_longer_member_name_is_not_swallowed_by_current_short_name",
+      "status": "pass",
+      "seconds": 0.0042
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_normal_third_person_references_quotes_and_lists_are_not_retargeted",
+      "status": "pass",
+      "seconds": 0.0078
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_recent_sender_metadata_catches_wrong_name_with_partial_member_cache",
+      "status": "pass",
+      "seconds": 0.0076
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_requested_performances_keep_their_intended_addressee",
+      "status": "pass",
+      "seconds": 0.0067
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_screenshot_wrong_name_is_reanswered_not_blindly_renamed",
+      "status": "pass",
+      "seconds": 0.0054
+    },
+    {
+      "test": "test_live_behavior_regressions.ReplyBindingTests.test_wrong_actual_mention_and_inline_unpunctuated_name_are_detected",
+      "status": "pass",
+      "seconds": 0.0092
+    },
+    {
+      "test": "test_llm_models.ModelCompatibilityTests.test_gemma_empty_answer_retries_once_without_enabling_thinking",
+      "status": "pass",
+      "seconds": 0.0048
+    },
+    {
+      "test": "test_llm_models.ModelCompatibilityTests.test_gemma_preserves_internal_json_and_short_token_budget",
+      "status": "pass",
+      "seconds": 0.0043
+    },
+    {
+      "test": "test_llm_models.ModelCompatibilityTests.test_gemma_uses_boolean_thinking_without_forwarding_gpt_levels",
+      "status": "pass",
+      "seconds": 0.0189
+    },
+    {
+      "test": "test_llm_models.ModelCompatibilityTests.test_gpt_instructions_are_preserved_in_one_block_without_elevating_chat",
+      "status": "pass",
+      "seconds": 0.0043
+    },
+    {
+      "test": "test_llm_models.ModelCompatibilityTests.test_gpt_keeps_named_levels_and_defaults_legacy_booleans_to_low",
+      "status": "pass",
+      "seconds": 0.0072
+    },
+    {
+      "test": "test_llm_models.ModelCompatibilityTests.test_gpt_small_json_budget_leaves_room_for_reasoning_without_an_extra_call",
+      "status": "pass",
+      "seconds": 0.0053
+    },
+    {
+      "test": "test_llm_models.ModelCompatibilityTests.test_unrelated_models_do_not_receive_gemma_options",
+      "status": "pass",
+      "seconds": 0.0049
+    },
+    {
+      "test": "test_member_memory.MemberMemoryTests.test_context_loads_member_notes_without_keyword_match",
+      "status": "pass",
+      "seconds": 0.0745
+    },
+    {
+      "test": "test_member_memory.MemberMemoryTests.test_extraction_requires_evidence_and_excludes_bot_reply",
+      "status": "pass",
+      "seconds": 0.0498
+    },
+    {
+      "test": "test_member_memory.MemberMemoryTests.test_false_master_history_cannot_change_trusted_identity",
+      "status": "pass",
+      "seconds": 0.1002
+    },
+    {
+      "test": "test_member_memory.MemberMemoryTests.test_identity_and_server_isolation_and_corrections",
+      "status": "pass",
+      "seconds": 0.0759
+    },
+    {
+      "test": "test_member_memory.MemberMemoryTests.test_missing_owner_remark_requires_observed_inactivity",
+      "status": "pass",
+      "seconds": 0.086
+    },
+    {
+      "test": "test_member_memory.MemberMemoryTests.test_natural_requests_and_explanatory_question",
+      "status": "pass",
+      "seconds": 0.0492
+    },
+    {
+      "test": "test_member_memory.MemberMemoryTests.test_owner_only_reset",
+      "status": "pass",
+      "seconds": 0.0589
+    },
+    {
+      "test": "test_member_memory.MemberMemoryTests.test_reset_preserves_profiles_instructions_and_other_channel",
+      "status": "pass",
+      "seconds": 0.0602
+    },
+    {
+      "test": "test_meme_drops.MemeDropTests.test_disabled_drops_do_not_fetch",
+      "status": "pass",
+      "seconds": 0.0034
+    },
+    {
+      "test": "test_meme_drops.MemeDropTests.test_disabled_spam_stops_shared_channel_memes_before_fetching",
+      "status": "pass",
+      "seconds": 0.0189
+    },
+    {
+      "test": "test_meme_drops.MemeDropTests.test_disabled_stickers_do_not_stop_separate_meme_channel",
+      "status": "pass",
+      "seconds": 0.0055
+    },
+    {
+      "test": "test_meme_drops.MemeDropTests.test_first_drop_waits_and_due_drop_uses_embed",
+      "status": "pass",
+      "seconds": 0.0058
+    },
+    {
+      "test": "test_meme_drops.MemeDropTests.test_owner_can_request_memes_with_all_scheduled_memes_disabled",
+      "status": "pass",
+      "seconds": 0.0054
+    },
+    {
+      "test": "test_meme_uniqueness.MemeUniquenessTests.test_atomic_claim_rejects_hash_url_and_post_duplicates",
+      "status": "pass",
+      "seconds": 0.0333
+    },
+    {
+      "test": "test_meme_uniqueness.MemeUniquenessTests.test_generated_captions_and_rendered_bytes_are_unique",
+      "status": "pass",
+      "seconds": 0.067
+    },
+    {
+      "test": "test_meme_uniqueness.MemeUniquenessTests.test_legacy_last_drop_and_history_survive_connection_restart",
+      "status": "pass",
+      "seconds": 0.0917
+    },
+    {
+      "test": "test_music_requests.PlaylistFileTests.test_fallback_filename_invalid_ids_and_duplicates",
+      "status": "pass",
+      "seconds": 0.0054
+    },
+    {
+      "test": "test_music_requests.PlaylistRequestTests.test_broken_history_and_empty_playlist_are_safe",
+      "status": "pass",
+      "seconds": 0.0346
+    },
+    {
+      "test": "test_music_requests.PlaylistRequestTests.test_explicit_track_can_be_replayed",
+      "status": "pass",
+      "seconds": 0.0286
+    },
+    {
+      "test": "test_music_requests.PlaylistRequestTests.test_manual_request_bypasses_autonomous_settings_and_lottery",
+      "status": "pass",
+      "seconds": 0.0312
+    },
+    {
+      "test": "test_music_requests.PlaylistRequestTests.test_no_match_or_database_error_uses_discreet_reply",
+      "status": "pass",
+      "seconds": 0.0199
+    },
+    {
+      "test": "test_music_requests.PlaylistRequestTests.test_random_selection_shares_history_with_idle_posts",
+      "status": "pass",
+      "seconds": 0.0392
+    },
+    {
+      "test": "test_music_requests.PlaylistRequestTests.test_recent_history_survives_a_restart_and_is_channel_scoped",
+      "status": "pass",
+      "seconds": 0.0882
+    },
+    {
+      "test": "test_music_requests.PlaylistRequestTests.test_title_artist_category_and_combined_search",
+      "status": "pass",
+      "seconds": 0.0436
+    },
+    {
+      "test": "test_music_requests.PlaylistRequestTests.test_unknown_song_is_not_replaced_by_random_song",
+      "status": "pass",
+      "seconds": 0.0231
+    },
+    {
+      "test": "test_music_requests.SongIntentTests.test_discussion_negation_voice_and_existing_services_are_not_song_delivery",
+      "status": "pass",
+      "seconds": 0.5405
+    },
+    {
+      "test": "test_music_requests.SongIntentTests.test_named_requests_preserve_searchable_metadata",
+      "status": "pass",
+      "seconds": 0.0037
+    },
+    {
+      "test": "test_music_requests.SongIntentTests.test_random_requests_do_not_need_a_model_call",
+      "status": "pass",
+      "seconds": 0.0035
+    },
+    {
+      "test": "test_music_requests.SongIntentTests.test_semantic_song_requests_are_allowlisted_without_invented_urls",
+      "status": "pass",
+      "seconds": 0.0043
+    },
+    {
+      "test": "test_opinions.OpinionChatHookTests.test_private_and_unaddressed_chat_does_not_schedule_learning",
+      "status": "pass",
+      "seconds": 0.0346
+    },
+    {
+      "test": "test_opinions.OpinionChatHookTests.test_public_direct_chat_schedules_learning",
+      "status": "pass",
+      "seconds": 0.0381
+    },
+    {
+      "test": "test_opinions.OpinionRoutingTests.test_only_public_human_direct_exchanges_are_observed",
+      "status": "pass",
+      "seconds": 0.001
+    },
+    {
+      "test": "test_opinions.OpinionRoutingTests.test_ranking_detection_without_a_member_mention",
+      "status": "pass",
+      "seconds": 0.0001
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_bad_provider_json_never_replaces_an_impression",
+      "status": "pass",
+      "seconds": 0.0613
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_context_uses_live_names_and_not_raw_private_evidence_or_scores",
+      "status": "pass",
+      "seconds": 0.0396
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_cooldown_survives_followup_messages",
+      "status": "pass",
+      "seconds": 0.0738
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_evidence_must_come_from_this_member",
+      "status": "pass",
+      "seconds": 0.0436
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_internal_boolean_is_not_an_affinity_integer",
+      "status": "pass",
+      "seconds": 0.0314
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_member_context_is_actually_included_in_normal_reply_context",
+      "status": "pass",
+      "seconds": 0.0378
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_negative_impression_requires_two_distinct_supporting_messages",
+      "status": "pass",
+      "seconds": 0.0497
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_negative_rankings_respect_third_party_no_roasting",
+      "status": "pass",
+      "seconds": 0.06
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_normal_member_opinion_questions_are_not_protected_requests",
+      "status": "pass",
+      "seconds": 0.0027
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_only_six_bounded_samples_are_kept",
+      "status": "pass",
+      "seconds": 0.0899
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_opt_out_checked_again_after_generation",
+      "status": "pass",
+      "seconds": 0.0538
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_rankings_include_unmentioned_members_but_no_other_servers_bots_or_leavers",
+      "status": "pass",
+      "seconds": 0.0714
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_recent_reset_keeps_subjective_memory_separate",
+      "status": "pass",
+      "seconds": 0.0251
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_reconciliation_can_reverse_an_old_negative_impression",
+      "status": "pass",
+      "seconds": 0.0548
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_review_after_three_distinct_exchanges_not_every_message",
+      "status": "pass",
+      "seconds": 0.0699
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_review_busy_does_not_queue_another_model_call",
+      "status": "pass",
+      "seconds": 0.0426
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_review_reservation_is_atomic_and_persistent",
+      "status": "pass",
+      "seconds": 0.0578
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_same_evidence_twice_is_not_a_pattern",
+      "status": "pass",
+      "seconds": 0.039
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_simple_distressed_and_credential_messages_not_sampled",
+      "status": "pass",
+      "seconds": 0.0159
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_stale_impressions_not_loaded_or_used_as_prior",
+      "status": "pass",
+      "seconds": 0.0703
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_supported_negative_impression_can_be_saved",
+      "status": "pass",
+      "seconds": 0.0449
+    },
+    {
+      "test": "test_opinions.OpinionTests.test_timeout_is_quiet_and_does_not_erase_the_old_impression",
+      "status": "pass",
+      "seconds": 0.047
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_bot_mention_self_and_target_requests",
+      "status": "pass",
+      "seconds": 0.0064
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_common_pings_route_without_a_model_call",
+      "status": "pass",
+      "seconds": 0.0069
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_exact_owner_line_is_not_suppressed_for_repetition",
+      "status": "pass",
+      "seconds": 0.0658
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_gender_choice_generates_in_character_in_one_call",
+      "status": "pass",
+      "seconds": 0.042
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_guest_name_or_classifier_cannot_authorize_a_real_ping",
+      "status": "pass",
+      "seconds": 0.0038
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_mass_roles_quotes_questions_and_negated_pings_do_not_notify",
+      "status": "pass",
+      "seconds": 0.0072
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_no_eligible_member_gets_a_reply_not_a_fake_ping",
+      "status": "pass",
+      "seconds": 0.0217
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_opt_out_is_rechecked_before_the_actual_ping",
+      "status": "pass",
+      "seconds": 0.0214
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_owner_can_request_one_reply_honorary_title_without_changing_authority",
+      "status": "pass",
+      "seconds": 0.079
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_owner_empty_generation_and_filtered_empty_output_get_small_replies",
+      "status": "pass",
+      "seconds": 0.095
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_owner_ping_reaches_real_action_from_chat",
+      "status": "pass",
+      "seconds": 0.0323
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_owner_still_gets_a_reply_if_novelty_retry_also_repeats",
+      "status": "pass",
+      "seconds": 0.0272
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_owner_text_does_not_start_an_unaddressed_chat_but_ping_does",
+      "status": "pass",
+      "seconds": 0.0071
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_ping_me_resolves_the_verified_requester",
+      "status": "pass",
+      "seconds": 0.0256
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_random_ping_only_notifies_a_visible_eligible_human",
+      "status": "pass",
+      "seconds": 0.0208
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_specific_ping_reparses_real_mentions_instead_of_model_target",
+      "status": "pass",
+      "seconds": 0.0288
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_standalone_gif_does_not_replace_the_owners_actual_answer",
+      "status": "pass",
+      "seconds": 0.0617
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_target_must_be_in_this_channel_and_not_opted_out",
+      "status": "pass",
+      "seconds": 0.0221
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_thread_members_resolve_to_real_guild_members",
+      "status": "pass",
+      "seconds": 0.0238
+    },
+    {
+      "test": "test_owner_obedience.OwnerObedienceTests.test_verbal_output_gender_and_titles_are_chat_without_a_classifier_call",
+      "status": "pass",
+      "seconds": 0.0067
+    },
+    {
+      "test": "test_personality.CareCueTests.test_clear_distress_and_discomfort_are_not_playful_banter",
+      "status": "pass",
+      "seconds": 0.0003
+    },
+    {
+      "test": "test_personality.CareCueTests.test_normal_banter_is_not_promoted_to_distress_by_loose_slang",
+      "status": "pass",
+      "seconds": 0.0002
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_affection_does_not_override_flirting_opt_out",
+      "status": "pass",
+      "seconds": 0.0478
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_banter_has_range_and_initiative_in_the_existing_reply_call",
+      "status": "pass",
+      "seconds": 0.0258
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_care_takes_priority_even_with_negative_rapport",
+      "status": "pass",
+      "seconds": 0.0395
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_distinct_members_keep_their_own_chemistry",
+      "status": "pass",
+      "seconds": 0.0381
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_fond_rapport_adds_warmth_not_a_requirement_to_flirt",
+      "status": "pass",
+      "seconds": 0.0263
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_friction_can_be_sassy_without_mandatory_hostility",
+      "status": "pass",
+      "seconds": 0.0224
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_neutral_rapport_is_open_to_warmth_not_a_fixed_rude_label",
+      "status": "pass",
+      "seconds": 0.0274
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_no_roasting_boundary_overrides_friendly_banter_suggestion",
+      "status": "pass",
+      "seconds": 0.0366
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_personality_does_not_add_automatic_gifs_to_care_turns",
+      "status": "pass",
+      "seconds": 0.0259
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_semantic_care_instruction_is_not_limited_to_english_keywords",
+      "status": "pass",
+      "seconds": 0.0204
+    },
+    {
+      "test": "test_personality.PersonalityTests.test_unknown_member_is_not_assigned_an_unearned_impression",
+      "status": "pass",
+      "seconds": 0.029
+    },
+    {
+      "test": "test_social.SocialTests.test_actions_enforce_owner_at_execution",
+      "status": "pass",
+      "seconds": 0.0032
+    },
+    {
+      "test": "test_social.SocialTests.test_generated_baby_talk_is_replaced_and_does_not_trigger_media",
+      "status": "pass",
+      "seconds": 0.0437
+    },
+    {
+      "test": "test_social.SocialTests.test_guest_commands_and_questions",
+      "status": "pass",
+      "seconds": 0.0042
+    },
+    {
+      "test": "test_social.SocialTests.test_independent_gif_and_channel_cooldown",
+      "status": "pass",
+      "seconds": 0.0055
+    },
+    {
+      "test": "test_social.SocialTests.test_meme_must_fit_exchange",
+      "status": "pass",
+      "seconds": 0.0083
+    },
+    {
+      "test": "test_social.SocialTests.test_no_media_choice_does_not_fetch",
+      "status": "pass",
+      "seconds": 0.0049
+    },
+    {
+      "test": "test_social.SocialTests.test_normal_guest_question_can_receive_independent_embed",
+      "status": "pass",
+      "seconds": 0.037
+    },
+    {
+      "test": "test_social.SocialTests.test_protected_guest_command_is_shushed_before_chat_or_media",
+      "status": "pass",
+      "seconds": 0.0473
+    },
+    {
+      "test": "test_social.SocialTests.test_refusals_are_generated_not_selected_from_examples",
+      "status": "pass",
+      "seconds": 0.0068
+    },
+    {
+      "test": "test_social.SocialTests.test_roast_gif_can_be_selected_as_the_entire_reply",
+      "status": "pass",
+      "seconds": 0.0078
+    },
+    {
+      "test": "test_social.SocialTests.test_standalone_gif_delivery_has_no_unused_text_in_history",
+      "status": "pass",
+      "seconds": 0.0419
+    },
+    {
+      "test": "test_song_and_gif_delivery.GifProviderTests.test_all_providers_unavailable_returns_no_fake_success",
+      "status": "pass",
+      "seconds": 0.0041
+    },
+    {
+      "test": "test_song_and_gif_delivery.GifProviderTests.test_automatic_media_can_still_decline_reused_gifs",
+      "status": "pass",
+      "seconds": 0.0379
+    },
+    {
+      "test": "test_song_and_gif_delivery.GifProviderTests.test_explicit_small_result_pool_rotates_instead_of_stopping_after_exhaustion",
+      "status": "pass",
+      "seconds": 0.111
+    },
+    {
+      "test": "test_song_and_gif_delivery.GifProviderTests.test_jumping_and_serving_use_real_gif_search_not_unrelated_reactions",
+      "status": "pass",
+      "seconds": 0.0286
+    },
+    {
+      "test": "test_song_and_gif_delivery.GifProviderTests.test_unauthorized_giphy_falls_back_to_free_matching_action_and_rotates",
+      "status": "pass",
+      "seconds": 0.0325
+    },
+    {
+      "test": "test_song_and_gif_delivery.PhysicalRequestTests.test_custom_avatar_scenes_still_resolve_semantically_without_changing_the_requested_scene",
+      "status": "pass",
+      "seconds": 0.0034
+    },
+    {
+      "test": "test_song_and_gif_delivery.PhysicalRequestTests.test_explicit_gif_scenes_keep_the_subject_instead_of_becoming_generic_actions",
+      "status": "pass",
+      "seconds": 0.0035
+    },
+    {
+      "test": "test_song_and_gif_delivery.PhysicalRequestTests.test_negated_actions_and_explanations_never_fetch_media",
+      "status": "pass",
+      "seconds": 0.018
+    },
+    {
+      "test": "test_song_and_gif_delivery.PhysicalRequestTests.test_owner_and_guest_explicit_jump_requests_work_when_automatic_media_is_disabled",
+      "status": "pass",
+      "seconds": 0.0432
+    },
+    {
+      "test": "test_song_and_gif_delivery.PhysicalRequestTests.test_physical_actions_use_gifs_with_or_without_a_target",
+      "status": "pass",
+      "seconds": 0.0077
+    },
+    {
+      "test": "test_song_and_gif_delivery.PhysicalRequestTests.test_unlisted_physical_actions_are_semantically_routed_not_assumed_to_be_avatar_edits",
+      "status": "pass",
+      "seconds": 0.0047
+    },
+    {
+      "test": "test_song_and_gif_delivery.SongDeliveryTests.test_actual_catalog_accepts_titles_with_artist_without_mood_confusion",
+      "status": "pass",
+      "seconds": 0.6046
+    },
+    {
+      "test": "test_song_and_gif_delivery.SongDeliveryTests.test_duplicate_video_ids_preserve_every_original_searchable_label",
+      "status": "pass",
+      "seconds": 0.0241
+    },
+    {
+      "test": "test_song_and_gif_delivery.SongDeliveryTests.test_full_song_requests_match_mood_words_artist_and_title_punctuation",
+      "status": "pass",
+      "seconds": 0.0533
+    },
+    {
+      "test": "test_song_and_gif_delivery.SongDeliveryTests.test_hinglish_song_requests_do_not_need_the_model",
+      "status": "pass",
+      "seconds": 0.0045
+    },
+    {
+      "test": "test_song_and_gif_delivery.SongDeliveryTests.test_minor_title_typo_and_unambiguous_short_title_are_supported",
+      "status": "pass",
+      "seconds": 0.0328
+    },
+    {
+      "test": "test_song_and_gif_delivery.SongDeliveryTests.test_real_chat_pipeline_sends_actual_playlist_url_not_a_claim",
+      "status": "pass",
+      "seconds": 0.0262
+    },
+    {
+      "test": "test_song_and_gif_delivery.SongDeliveryTests.test_relative_legacy_filename_finds_actual_catalog_without_cwd_dependency",
+      "status": "pass",
+      "seconds": 0.0049
+    },
+    {
+      "test": "test_song_and_gif_delivery.SongDeliveryTests.test_repeating_a_request_with_one_matching_track_is_not_silenced",
+      "status": "pass",
+      "seconds": 0.0392
+    },
+    {
+      "test": "test_spam_quiet_hours.SpamQuietHoursTests.test_blank_window_disables_spam_quiet_hours",
+      "status": "pass",
+      "seconds": 0.0301
+    },
+    {
+      "test": "test_spam_quiet_hours.SpamQuietHoursTests.test_global_quiet_hours_still_suppress_stickers",
+      "status": "pass",
+      "seconds": 0.0067
+    },
+    {
+      "test": "test_spam_quiet_hours.SpamQuietHoursTests.test_meme_fetch_crossing_midnight_does_not_send",
+      "status": "pass",
+      "seconds": 0.0114
+    },
+    {
+      "test": "test_spam_quiet_hours.SpamQuietHoursTests.test_meme_resumes_at_eight",
+      "status": "pass",
+      "seconds": 0.0101
+    },
+    {
+      "test": "test_spam_quiet_hours.SpamQuietHoursTests.test_music_generation_crossing_midnight_does_not_send",
+      "status": "pass",
+      "seconds": 0.0091
+    },
+    {
+      "test": "test_spam_quiet_hours.SpamQuietHoursTests.test_night_skips_stickers_and_meme_music_fetches",
+      "status": "pass",
+      "seconds": 0.0052
+    },
+    {
+      "test": "test_spam_quiet_hours.SpamQuietHoursTests.test_quiet_window_boundaries_and_utc_conversion",
+      "status": "pass",
+      "seconds": 0.0048
+    },
+    {
+      "test": "test_spam_quiet_hours.SpamQuietHoursTests.test_quiet_window_does_not_silence_other_channels",
+      "status": "pass",
+      "seconds": 0.0075
+    },
+    {
+      "test": "test_spam_quiet_hours.SpamQuietHoursTests.test_sticker_resumes_at_eight_without_catching_up",
+      "status": "pass",
+      "seconds": 0.0109
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_actual_ollama_request_retains_current_sender_after_system_merge",
+      "status": "pass",
+      "seconds": 0.046
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_concurrent_contexts_do_not_share_a_latest_speaker",
+      "status": "pass",
+      "seconds": 0.0553
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_latest_request_keeps_owner_identity_after_another_member",
+      "status": "pass",
+      "seconds": 0.0397
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_matching_display_names_do_not_transfer_owner_authority",
+      "status": "pass",
+      "seconds": 0.0334
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_native_current_message_is_not_treated_as_english_metadata",
+      "status": "pass",
+      "seconds": 0.0349
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_native_display_name_cannot_change_english_request_language",
+      "status": "pass",
+      "seconds": 0.0355
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_novelty_retry_keeps_current_sender_and_raw_language",
+      "status": "pass",
+      "seconds": 0.0256
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_queued_discord_messages_reply_to_their_own_requesters",
+      "status": "pass",
+      "seconds": 0.0682
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_quoted_member_is_not_the_person_asking",
+      "status": "pass",
+      "seconds": 0.0374
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_slash_ask_uses_its_own_author_and_raw_language",
+      "status": "pass",
+      "seconds": 0.0315
+    },
+    {
+      "test": "test_speaker_attribution.SpeakerAttributionTests.test_user_text_and_display_name_cannot_change_the_envelope",
+      "status": "pass",
+      "seconds": 0.0519
+    },
+    {
+      "test": "test_sticker_trigger.StickerTriggerTests.test_bots_and_unrelated_text_do_not_trigger",
+      "status": "pass",
+      "seconds": 0.0034
+    },
+    {
+      "test": "test_sticker_trigger.StickerTriggerTests.test_cache_miss_fetches_sticker_and_missing_sticker_is_quiet",
+      "status": "pass",
+      "seconds": 0.0083
+    },
+    {
+      "test": "test_sticker_trigger.StickerTriggerTests.test_static_animated_and_typed_emoji_send_one_sticker",
+      "status": "pass",
+      "seconds": 0.0083
+    }
+  ],
+  "coverage": "Statement and branch coverage not measured; coverage.py is not installed."
+}
