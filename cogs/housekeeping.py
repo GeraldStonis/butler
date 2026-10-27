@@ -144,12 +144,11 @@ class HousekeepingCog(commands.Cog):
     @housekeeping_loop.before_loop
     async def before_housekeeping(self) -> None:
         await self.bot.wait_until_ready()
-        log.info("Dead-chat settings: enabled=%s channels=%s base=%ds preferred_user=%d chance=%.2f quiet=%s timezone=%s cap=5",
+        log.info("Dead-chat settings: enabled=%s channels=%s base=%ds preferred_user=%d chance=%.2f excluded_users=%s quiet=%s timezone=%s cap=5",
                  config.DEAD_CHAT_ENABLED, config.DEAD_CHAT_CHANNEL_IDS, config.DEAD_CHAT_IDLE_SECONDS,
                  config.DEAD_CHAT_PREFERRED_USER_ID, config.DEAD_CHAT_PREFERRED_CHANCE,
+                 config.DEAD_CHAT_EXCLUDED_USER_IDS,
                  config.DEAD_CHAT_QUIET_HOURS or "off", config.SERVER_TIMEZONE)
-        if config.DEAD_CHAT_ENABLED and not config.DEAD_CHAT_PREFERRED_USER_ID:
-            log.warning("Preferred dead-chat targeting is disabled: DEAD_CHAT_PREFERRED_USER_ID=0")
 
     @tasks.loop(seconds=60)
     async def sticker_spam_loop(self) -> None:
@@ -269,7 +268,8 @@ class HousekeepingCog(commands.Cog):
                 if engagement.dead_chat_quiet_now() or not await engagement.can_post(channel.id, min_gap_seconds=0):
                     continue
                 # A member can revoke permission while the model is generating.
-                if member.id in await db.get_dead_chat_opt_outs(channel.guild.id):
+                if (member.id in config.DEAD_CHAT_EXCLUDED_USER_IDS
+                        or member.id in await db.get_dead_chat_opt_outs(channel.guild.id)):
                     continue
                 sent = await channel.send(
                     f"{member.mention} {line}",
@@ -299,7 +299,8 @@ class HousekeepingCog(commands.Cog):
         eligible = [
             member
             for member in channel.members
-            if not member.bot and member.id != config.OWNER_ID and member.id not in opted_out
+            if not member.bot and member.id != config.OWNER_ID
+            and member.id not in opted_out and member.id not in config.DEAD_CHAT_EXCLUDED_USER_IDS
         ]
         preferred = next((m for m in eligible if m.id == config.DEAD_CHAT_PREFERRED_USER_ID), None)
         if preferred and config.DEAD_CHAT_PREFERRED_CHANCE > 0:

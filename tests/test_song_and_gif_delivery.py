@@ -122,6 +122,34 @@ class SongDeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('https://www.youtube.com/watch?v=aaaaaaaaaaa', message.reply.await_args.args[0])
         chat.assert_not_awaited()
 
+    async def test_screenshot_request_reports_no_match_for_owner_and_guest(self):
+        songs = [{'title': 'Tere Pyar Mein', 'artist': 'Kaavish', 'youtubeId': 'kfKP4o-bXzM'},
+                 {'title': 'Tere Pyar Mein Main', 'artist': 'Jaspinder Narula, Roop Kumar Rathod',
+                  'youtubeId': 'XQCz6-anYBo'}]
+        for user_id in (config.OWNER_ID, config.OWNER_ID + 1):
+            with self.subTest(user_id=user_id):
+                cog = ChatCog(SimpleNamespace(user=SimpleNamespace(id=999)))
+                cog._detect_mode = AsyncMock(return_value='DIRECT_ADDRESS')
+                cog._maybe_send_stfu_sticker = AsyncMock(return_value=False)
+                message = SimpleNamespace(
+                    author=SimpleNamespace(id=user_id, name='Ronix', display_name='Ronix', bot=False),
+                    guild=None, channel=SimpleNamespace(id=10, typing=MagicMock()), mentions=[], reference=None,
+                    content='nixi play hum tere pyar me', reply=AsyncMock())
+                with patch.object(music, 'load_songs', return_value=songs), \
+                        patch.object(config, 'ENABLE_NATURAL_OWNER_ACTIONS', True), \
+                        patch('cogs.chat.conversation.generate_reply', AsyncMock()) as chat, \
+                        patch('cogs.chat.conversation.discreet_reply', AsyncMock()) as aside, \
+                        patch.object(intent.llm, 'generate_response', AsyncMock()) as model, \
+                        patch.object(memory, 'log_delivery', AsyncMock()):
+                    await cog.on_message(message)
+                self.assertEqual(message.reply.await_args.args[0],
+                                 "I couldn't match that song in my playlist. What's the exact title or artist?")
+                self.assertFalse(message.reply.await_args.kwargs['allowed_mentions'].users)
+                self.assertIsNone(await db.get_state('music_last_delivered:10'))
+                chat.assert_not_awaited()
+                aside.assert_not_awaited()
+                model.assert_not_awaited()
+
 
 class PhysicalRequestTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):

@@ -141,12 +141,13 @@ class DeadChatStarvationTests(unittest.IsolatedAsyncioTestCase):
         self.enterContext(patch.object(memory, '_channel_locks', {}))
         for name, value in [('OWNER_ID', 100), ('DEAD_CHAT_ENABLED', True),
                             ('DEAD_CHAT_CHANNEL_IDS', [10]), ('DEAD_CHAT_IDLE_SECONDS', 60),
-                            ('DEAD_CHAT_PREFERRED_USER_ID', 1423982225938190346),
+                            ('DEAD_CHAT_PREFERRED_USER_ID', 201),
+                            ('DEAD_CHAT_EXCLUDED_USER_IDS', []),
                             ('DEAD_CHAT_PREFERRED_CHANCE', 1.0), ('QUIET_HOURS', ''),
                             ('SPAM_QUIET_HOURS', ''), ('AUTONOMOUS_MIN_GAP_SECONDS', 120)]:
             self.enterContext(patch.object(config, name, value))
         self.enterContext(patch('cogs.housekeeping.engagement.dead_chat_quiet_now', return_value=False))
-        self.target = SimpleNamespace(id=1423982225938190346, mention='<@1423982225938190346>', bot=False)
+        self.target = SimpleNamespace(id=201, mention='<@201>', bot=False)
         self.other = SimpleNamespace(id=200, mention='<@200>', bot=False)
         self.channel = MagicMock(spec=discord.TextChannel)
         self.channel.id = 10
@@ -210,7 +211,7 @@ class DeadChatStarvationTests(unittest.IsolatedAsyncioTestCase):
         await db.set_member_preferences(1, self.target.id, {'pings': False})
         self.assertIs(await self.cog._pick_random_member(self.channel), self.other)
 
-    async def test_default_priority_is_majority_of_five_with_rotation_not_random_luck(self):
+    async def test_explicit_priority_is_majority_of_five_with_rotation_not_random_luck(self):
         picks = []
         for _ in range(5):
             member = await self.cog._pick_random_member(self.channel)
@@ -230,30 +231,33 @@ class DeadChatStarvationTests(unittest.IsolatedAsyncioTestCase):
 
 
 class DeploymentPriorityDefaultsTests(unittest.TestCase):
-    def test_missing_or_blank_variables_keep_requested_priority_and_explicit_zero_disables_it(self):
-        names = ['DEAD_CHAT_PREFERRED_USER_ID', 'DEAD_CHAT_PREFERRED_CHANCE', 'DEAD_CHAT_IDLE_SECONDS']
-        original = {name: os.environ.get(name) for name in names}
-        try:
-            for value in [None, '']:
-                for name in names[:2]:
-                    if value is None:
-                        os.environ.pop(name, None)
-                    else:
-                        os.environ[name] = value
-                # config calls load_dotenv, so isolate the environment under test.
-                with patch('dotenv.load_dotenv'):
-                    values = runpy.run_path(config.__file__)
-                self.assertEqual(values['DEAD_CHAT_PREFERRED_USER_ID'], 1423982225938190346)
-                self.assertEqual(values['DEAD_CHAT_PREFERRED_CHANCE'], 1.0)
-            os.environ['DEAD_CHAT_PREFERRED_USER_ID'] = '0'
-            os.environ['DEAD_CHAT_PREFERRED_CHANCE'] = '0'
+    def config_values(self, **settings):
+        with patch.dict(os.environ):
+            for name in ['DEAD_CHAT_PREFERRED_USER_ID', 'DEAD_CHAT_PREFERRED_CHANCE',
+                         'DEAD_CHAT_EXCLUDED_USER_IDS']:
+                os.environ.pop(name, None)
+            os.environ.update(settings)
+            # config calls load_dotenv, so isolate the environment under test.
             with patch('dotenv.load_dotenv'):
-                values = runpy.run_path(config.__file__)
-            self.assertEqual(values['DEAD_CHAT_PREFERRED_USER_ID'], 0)
-            self.assertEqual(values['DEAD_CHAT_PREFERRED_CHANCE'], 0)
-        finally:
-            for name, value in original.items():
-                if value is None:
-                    os.environ.pop(name, None)
-                else:
-                    os.environ[name] = value
+                return runpy.run_path(config.__file__)
+
+    def test_missing_or_blank_preference_disables_priority_and_keeps_default_exclusion(self):
+        for settings in [{}, {'DEAD_CHAT_PREFERRED_USER_ID': '', 'DEAD_CHAT_PREFERRED_CHANCE': ''}]:
+            with self.subTest(settings=settings):
+                values = self.config_values(**settings)
+                self.assertEqual(values['DEAD_CHAT_PREFERRED_USER_ID'], 0)
+                self.assertEqual(values['DEAD_CHAT_PREFERRED_CHANCE'], 1.0)
+                self.assertEqual(values['DEAD_CHAT_EXCLUDED_USER_IDS'], [1423982225938190346])
+
+    def test_explicit_zero_preference_and_probability_are_preserved(self):
+        values = self.config_values(DEAD_CHAT_PREFERRED_USER_ID='0', DEAD_CHAT_PREFERRED_CHANCE='0')
+        self.assertEqual(values['DEAD_CHAT_PREFERRED_USER_ID'], 0)
+        self.assertEqual(values['DEAD_CHAT_PREFERRED_CHANCE'], 0)
+        self.assertEqual(values['DEAD_CHAT_EXCLUDED_USER_IDS'], [1423982225938190346])
+
+    def test_explicit_exclusion_list_is_loaded_independently_of_preference(self):
+        values = self.config_values(DEAD_CHAT_PREFERRED_USER_ID='201', DEAD_CHAT_PREFERRED_CHANCE='0.5',
+                                    DEAD_CHAT_EXCLUDED_USER_IDS='201, 202')
+        self.assertEqual(values['DEAD_CHAT_PREFERRED_USER_ID'], 201)
+        self.assertEqual(values['DEAD_CHAT_PREFERRED_CHANCE'], 0.5)
+        self.assertEqual(values['DEAD_CHAT_EXCLUDED_USER_IDS'], [201, 202])

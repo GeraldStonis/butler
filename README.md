@@ -514,7 +514,8 @@ MORNING_NEWS_TOPICS=world,india,technology,cybersecurity
 DEAD_CHAT_ENABLED=false
 DEAD_CHAT_IDLE_SECONDS=60
 DEAD_CHAT_CHANNEL_IDS=
-DEAD_CHAT_PREFERRED_USER_ID=1423982225938190346
+DEAD_CHAT_EXCLUDED_USER_IDS=1423982225938190346
+DEAD_CHAT_PREFERRED_USER_ID=0
 DEAD_CHAT_PREFERRED_CHANCE=1.0
 
 STICKER_SPAM_ENABLED=false
@@ -552,16 +553,20 @@ are required; keep the existing database volume mounted on Railway.
 
 Dead-chat revival uses the original roast-and-ping behavior: a freshly generated
 roast plus one random non-bot member's mention, excluding Ronix and members who
-opted out of pings or teasing. Set `DEAD_CHAT_PREFERRED_USER_ID` to a member who
-has asked for sharper roasts to favor that member; `0` disables preference.
-The requested target defaults to `1423982225938190346`, including when the ID
-variable is absent or blank. Set an explicit `0` to disable priority. With the
-preferred member eligible, `DEAD_CHAT_PREFERRED_CHANCE=1.0` always selects them
+opted out of pings or teasing. `DEAD_CHAT_EXCLUDED_USER_IDS` is a comma-separated
+list of members excluded from dead-chat pings, defaulting to `1423982225938190346`.
+These exclusions apply only to dead-chat nudges and override both preferred and
+random target selection. With no eligible member, no nudge is sent.
+
+Set `DEAD_CHAT_PREFERRED_USER_ID` to another eligible member who has asked for
+sharper roasts to favor that member; the default `0` disables preference. With
+the preferred member eligible, `DEAD_CHAT_PREFERRED_CHANCE=1.0` always selects them
 until two consecutive successful pings; Nixi then rotates to someone else when
 possible. This favors that member without pinging only them. Lower values, such
 as `0.8`, restore a probability roll. Rotation history survives restarts and
 advances only after delivery.
-If the member is absent, a bot, Ronix, or has opted out, normal selection applies.
+If the preferred member is absent, a bot, Ronix, excluded, or has opted out,
+normal selection applies among the remaining eligible members.
 Other members keep the normal playful tone; the preferred target gets a freshly
 generated cutting roast of their lurking or Discord theatrics, without slurs,
 threats, private facts, appearance-based insults or calls for a pile-on. The model
@@ -579,10 +584,13 @@ the five-ping/backoff limits still apply. Provider failures
 back off instead of repeatedly generating a nudge every 15 seconds.
 
 On Railway, set `DEAD_CHAT_ENABLED=true`, `DEAD_CHAT_IDLE_SECONDS=60`,
-`DEAD_CHAT_PREFERRED_USER_ID=1423982225938190346`, and
-`DEAD_CHAT_PREFERRED_CHANCE=1.0`, keeping your existing `DEAD_CHAT_CHANNEL_IDS`.
-Existing Railway variables override defaults; editing local `.env` does not
-update Railway. The worker logs its effective dead-chat settings after connecting.
+`DEAD_CHAT_EXCLUDED_USER_IDS=1423982225938190346`, and
+`DEAD_CHAT_PREFERRED_USER_ID=0`, keeping your existing `DEAD_CHAT_CHANNEL_IDS`.
+The default exclusion also blocks this member if an older deployed
+`DEAD_CHAT_PREFERRED_USER_ID` still points to them. Existing Railway variables
+override defaults; editing local `.env` does not update Railway. Redeploy the
+updated code for these rules to take effect. The worker logs its effective
+dead-chat settings after connecting.
 The scheduler checks about every 15 seconds; model/network time adds to delivery
 latency. The 24-hour deletion, overnight silence and five-ping cap still apply.
 
@@ -667,6 +675,9 @@ successfully delivered song in this channel, persists across restarts, and never
 uses a merely attempted selection as proof of delivery. This is a YouTube chat
 preview, not voice-channel audio playback.
 Unknown or ambiguously misspelled titles are not replaced by random tracks.
+When a request has no match, Nixi says so and asks for the exact title or artist,
+instead of responding with a conversational aside. An empty playlist gets a brief
+notice that there are no songs to share.
 Relative playlist paths resolve against the project directory. Either supported
 filename can fall back to the other when missing.
 Duplicate YouTube IDs remain one random-selection entry, but all original title

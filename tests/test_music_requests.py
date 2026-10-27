@@ -135,13 +135,34 @@ class PlaylistRequestTests(unittest.IsolatedAsyncioTestCase):
         remember.assert_awaited_once_with(message.reply.return_value, description='')
         self.assertIsNone(await db.get_state('music_idle:10'))
 
-    async def test_no_match_or_database_error_uses_discreet_reply(self):
+    async def test_no_match_explains_playlist_limit_without_generated_aside(self):
+        message = SimpleNamespace(author=SimpleNamespace(id=config.OWNER_ID), channel=SimpleNamespace(id=10),
+                                  content='nixi play hum tere pyar me', reply=AsyncMock())
+        with patch.object(actions, 'reply_discreetly', AsyncMock()) as aside, \
+                patch.object(actions.memory, 'log_delivery', AsyncMock()) as remember:
+            self.assertTrue(await actions.execute_owner_intent(message, intent.heuristic_intent(message.content)))
+        aside.assert_not_awaited()
+        self.assertEqual(message.reply.await_args.args[0],
+                         "I couldn't match that song in my playlist. What's the exact title or artist?")
+        self.assertFalse(message.reply.await_args.kwargs['mention_author'])
+        self.assertFalse(message.reply.await_args.kwargs['allowed_mentions'].users)
+        remember.assert_awaited_once_with(message.reply.return_value, description='')
+        self.assertIsNone(await db.get_state('music_last_delivered:10'))
+
+    async def test_empty_playlist_does_not_ask_for_a_title_on_random_request(self):
+        message = SimpleNamespace(author=SimpleNamespace(id=config.OWNER_ID), channel=SimpleNamespace(id=10),
+                                  content='nixi play a song', reply=AsyncMock())
+        with patch.object(music, 'load_songs', return_value=[]), \
+                patch.object(actions, 'reply_discreetly', AsyncMock()) as aside, \
+                patch.object(actions.memory, 'log_delivery', AsyncMock()):
+            self.assertTrue(await actions.execute_owner_intent(message, intent.OwnerIntent('song')))
+        aside.assert_not_awaited()
+        self.assertEqual(message.reply.await_args.args[0], "I don't have a song to share from my playlist right now.")
+
+    async def test_database_error_uses_discreet_reply(self):
         message = SimpleNamespace(author=SimpleNamespace(id=config.OWNER_ID), channel=SimpleNamespace(id=10),
                                   content='nixi play a song', reply=AsyncMock())
         with patch.object(actions, 'reply_discreetly', AsyncMock()) as aside:
-            self.assertTrue(await actions.execute_owner_intent(message, intent.OwnerIntent('song', query='unknown song')))
-            aside.assert_awaited_once_with(message, 'song', 'no_matching_song')
-            aside.reset_mock()
             with patch.object(music, 'select_song', AsyncMock(side_effect=RuntimeError('private diagnostic'))):
                 self.assertTrue(await actions.execute_owner_intent(message, intent.OwnerIntent('song')))
             aside.assert_awaited_once_with(message, 'song', 'exception')

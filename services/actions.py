@@ -120,7 +120,13 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
         if name == "song":
             song = await music.select_song(message.channel.id, owner_intent.query)
             if not song:
-                await reply_discreetly(message, name, "no_matching_song")
+                # A catalog miss needs useful feedback, not an unrelated generated aside.
+                text = ("I couldn't match that song in my playlist. What's the exact title or artist?"
+                        if owner_intent.query else
+                        "I don't have a song to share from my playlist right now.")
+                sent = await message.reply(text, mention_author=False,
+                                           allowed_mentions=discord.AllowedMentions.none())
+                await _remember_result(sent, '')
                 return True
             label = " - ".join(s for field in ("title", "artist")
                                if isinstance(s := song.get(field), str) and s.strip())

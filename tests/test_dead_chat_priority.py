@@ -20,6 +20,7 @@ class PreferredDeadChatTests(unittest.IsolatedAsyncioTestCase):
         for name, value in [('DB_PATH', ':memory:'), ('OWNER_ID', 99),
                             ('DEAD_CHAT_ENABLED', True), ('DEAD_CHAT_CHANNEL_IDS', [10]),
                             ('DEAD_CHAT_IDLE_SECONDS', 60), ('DEAD_CHAT_PREFERRED_USER_ID', 20),
+                            ('DEAD_CHAT_EXCLUDED_USER_IDS', []),
                             ('DEAD_CHAT_PREFERRED_CHANCE', 0.8), ('AUTONOMOUS_MIN_GAP_SECONDS', 120),
                             ('QUIET_HOURS', ''), ('STICKER_SPAM_CHANNEL_ID', 0)]:
             self.stack.enter_context(patch.object(config, name, value))
@@ -96,6 +97,32 @@ class PreferredDeadChatTests(unittest.IsolatedAsyncioTestCase):
         await db.set_member_preferences(1, 20, {'pings': False})
         self.assertIsNone(await self.cog._pick_random_member(self.channel))
 
+    async def test_exclusion_overrides_enabled_preferred_targeting(self):
+        with patch.object(config, 'DEAD_CHAT_EXCLUDED_USER_IDS', [self.preferred.id]):
+            self.assertIn(await self.cog._pick_random_member(self.channel), self.others)
+        self.roll.assert_not_called()
+
+    async def test_excluded_member_is_absent_from_random_fallback(self):
+        with patch.object(config, 'DEAD_CHAT_EXCLUDED_USER_IDS', [self.preferred.id]), \
+                patch.object(config, 'DEAD_CHAT_PREFERRED_CHANCE', 0), \
+                patch('cogs.housekeeping.random.choice', side_effect=lambda members: members[0]) as choose:
+            self.assertIn(await self.cog._pick_random_member(self.channel), self.others)
+        self.assertEqual({member.id for member in choose.call_args.args[0]}, {21, 22})
+        self.roll.assert_not_called()
+
+    async def test_only_excluded_member_skips_generation_and_counters(self):
+        self.channel.members = [self.preferred]
+        await self.ready()
+        with patch.object(config, 'DEAD_CHAT_EXCLUDED_USER_IDS', [self.preferred.id]), \
+                patch('cogs.housekeeping.generate_dead_chat_line', AsyncMock()) as generate:
+            await self.cog._maybe_nudge_dead_chat()
+        generate.assert_not_awaited()
+        self.channel.send.assert_not_awaited()
+        self.assertEqual((await db.get_channel_idle_candidates([10]))[0]['dead_ping_count'], 0)
+        self.assertIsNone(await db.get_state('dead_chat_target:10'))
+        self.assertIsNone(await db.get_state('dead_chat_target_streak:10'))
+        self.assertIsNone(await db.get_state('engagement_retry:10'))
+
     async def test_preferred_delivery_gets_savage_prompt_and_exactly_one_ping(self):
         await self.ready()
         with patch('cogs.housekeeping.generate_dead_chat_line', AsyncMock(return_value='ded chat. Even your drafts are lurking. Defend the take.')) as generate:
@@ -129,6 +156,22 @@ class PreferredDeadChatTests(unittest.IsolatedAsyncioTestCase):
         self.channel.send.assert_not_awaited()
         self.assertEqual((await db.get_channel_idle_candidates([10]))[0]['dead_ping_count'], 0)
         self.assertIsNone(await db.get_state('dead_chat_target_streak:10'))
+
+    async def test_exclusion_added_during_generation_prevents_delivery(self):
+        await self.ready()
+
+        async def generate(*args, **kwargs):
+            config.DEAD_CHAT_EXCLUDED_USER_IDS.append(self.preferred.id)
+            return 'ded chat. A fresh roast.'
+
+        with patch('cogs.housekeeping.generate_dead_chat_line', side_effect=generate) as model:
+            await self.cog._maybe_nudge_dead_chat()
+        model.assert_awaited_once_with(None, 0, savage=True)
+        self.channel.send.assert_not_awaited()
+        self.assertEqual((await db.get_channel_idle_candidates([10]))[0]['dead_ping_count'], 0)
+        self.assertIsNone(await db.get_state('dead_chat_target:10'))
+        self.assertIsNone(await db.get_state('dead_chat_target_streak:10'))
+        self.assertIsNone(await db.get_state('dead_chat_last_line:10'))
 
     async def test_shared_two_minute_cooldown_does_not_override_one_minute_dead_chat(self):
         await self.ready()
