@@ -25,6 +25,9 @@ The key design rule is simple:
 ## Current Features
 
 - Natural conversation when mentioned, replied to, or DM'd.
+- Ordinary GIF shares without an address or request stay quiet, including from
+  the owner. Trigger checks ignore URLs, so GIF filenames, link slugs and bot
+  names inside a link do not count as requests or an address to Nixi.
 - Every conversational reply stays attached to its requesting message. Recognizable
   wrong-member greetings/direct addresses get one recipient-correction generation
   before delivery, not a blind name swap that could attach another person's facts.

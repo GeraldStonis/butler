@@ -404,7 +404,16 @@ class ChatCog(commands.Cog):
 
     async def _detect_mode(self, message: discord.Message) -> str | None:
         """Determine why Nixi should speak, or return None for silence."""
-        content_lower = (message.content or "").lower()
+        # GIF links can contain action words and bot names. Mask complete links
+        # for triggers, keeping an argument for requests such as "search <URL>".
+        # Execution still receives the original message, including its URLs.
+        content = re.sub(
+            r"!?\[[^\]\n]*\]\(<?(?:https?://|www\.)[^\s]+>?\)"
+            r"|(?:https?://|www\.)[^\s<>]+"
+            r"|\b(?:[a-z0-9-]+\.)+(?:com|org|net|io|dev|in|co|gov|edu)(?:/[^\s<>]*)?\b",
+            "shared_link", message.content or "", flags=re.I,
+        ).strip()
+        content_lower = content.lower()
 
         if isinstance(message.channel, discord.DMChannel):
             return "DIRECT_ADDRESS"
@@ -413,7 +422,7 @@ class ChatCog(commands.Cog):
             config.ENABLE_NATURAL_OWNER_ACTIONS
             and message.author.id == config.OWNER_ID
         ):
-            request = intent.heuristic_intent(message.content, list(message.mentions))
+            request = intent.heuristic_intent(content, list(message.mentions))
             if request is not None and request.name != "chat":
                 return "DIRECT_ADDRESS"
 
