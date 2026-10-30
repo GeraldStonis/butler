@@ -109,7 +109,7 @@ class DeliveryRegressionTests(unittest.IsolatedAsyncioTestCase):
             self.enterContext(patch.object(media, name, AsyncMock(return_value=self.result)))
         self.enterContext(patch.object(search, 'web_search', AsyncMock(return_value=[])))
         self.enterContext(patch.object(search, 'summarize_results', AsyncMock(return_value=self.sent.content)))
-        self.enterContext(patch.object(actions, 'build_news_briefing', AsyncMock(return_value=self.sent.content)))
+        self.enterContext(patch.object(actions, 'build_news_briefing', AsyncMock(return_value=discord.Embed(description=self.sent.content))))
 
     async def asyncTearDown(self):
         await memory.shutdown()

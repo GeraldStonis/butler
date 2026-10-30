@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
+import html
 import logging
 import random
+import re
+from datetime import datetime, timezone
+from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import discord
 
@@ -42,12 +48,114 @@ async def reply_discreetly(message: discord.Message, kind: str, reason: str) -> 
     await memory.log_delivery(sent)
 
 
-async def build_news_briefing(topic: str | None = None, *, include_links: bool = False, language_request: str = "") -> str:
-    """Fetch and summarize a compact news briefing."""
-    query = topic or ", ".join(config.MORNING_NEWS_TOPICS)
-    results = await search.news_search(query, count=8)
-    return await search.summarize_results(query, results, mode="news", include_links=include_links,
-                                          language_request=language_request)
+def _news_source_text(text: str) -> str:
+    """Treat fetched headlines as plain text, including during a model outage."""
+    text = re.sub(r"<[^>]*>", " ", html.unescape(text))
+    text = re.sub(r"@(?:everyone|here)\b", "", filter_links(text), flags=re.I)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _news_sources(results: list[search.SearchItem]) -> list[search.SearchItem]:
+    sources = []
+    seen = set()
+    for item in results:
+        try:
+            url = urlsplit(item.url)
+            if (url.scheme not in {"http", "https"} or not url.hostname
+                    or url.username or url.password or len(item.url) > 700
+                    or any(c.isspace() or ord(c) < 32 or c in '<>"' for c in item.url)):
+                continue
+        except ValueError:
+            continue
+        title = _news_source_text(item.title)
+        description = _news_source_text(item.description)
+        if item.url in seen or not (title or description):
+            continue
+        sources.append(search.SearchItem(title, item.url, description))
+        seen.add(item.url)
+        if len(sources) == 3:
+            break
+    return sources
+
+
+def _short_news_text(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit - 1].rstrip() + "\N{HORIZONTAL ELLIPSIS}"
+
+
+def _news_fallback(results: list[search.SearchItem]) -> str:
+    headlines = []
+    for item in results:
+        title = discord.utils.escape_markdown(_short_news_text(item.title, 160))
+        description = discord.utils.escape_markdown(_short_news_text(item.description, 180))
+        headlines.append("\N{BULLET} " + (f"**{title}**" if title else description)
+                         + (f" — {description}" if title and description else ""))
+    return "\n\n".join(headlines)
+
+
+async def _news_section(topic: str, *, include_links: bool, language_request: str) -> tuple[str, list[search.SearchItem]]:
+    try:
+        results = _news_sources(await search.news_search(topic, count=3))
+    except Exception as exc:
+        log.warning("News section fetch failed (%s)", type(exc).__name__)
+        return "", []
+    if not results:
+        return "", []
+    try:
+        summary = await search.summarize_results(topic, results, mode="news", include_links=include_links,
+                                                 language_request=language_request)
+    except Exception as exc:
+        log.warning("News section summary unavailable (%s)", type(exc).__name__)
+        summary = ""
+    # Application code appends only fetched source destinations, and keeps them whole.
+    summary = re.sub(r"<@[^>]*>|@(?:everyone|here)\b", "", filter_links(summary), flags=re.I)
+    summary = re.sub(r"(?m)^\s*\[(?:\d+[ ,;-]*)+\]\s*$", "", summary).strip()
+    return summary or _news_fallback(results), results
+
+
+async def build_news_briefing(topic: str | None = None, *, include_links: bool = False,
+                              language_request: str = "") -> discord.Embed | None:
+    """Build separate, verified news sections; a model outage keeps fetched headlines."""
+    requested = topic.strip() if topic else ""
+    topics = []
+    seen = set()
+    for query in [requested] if requested else config.MORNING_NEWS_TOPICS:
+        query = query.strip()
+        if query and query.casefold() not in seen:
+            topics.append(query)
+            seen.add(query.casefold())
+        if len(topics) == 6:
+            break
+    if not topics:
+        return None
+    sections = await asyncio.gather(*(_news_section(query, include_links=include_links,
+                                                    language_request=language_request) for query in topics))
+    if not any(results for _, results in sections):
+        return None
+
+    embed = discord.Embed(title="News Briefing" if requested else "Morning News", colour=0xE7B75A)
+    try:
+        now = datetime.now(ZoneInfo(config.MORNING_NEWS_TIMEZONE))
+    except (ZoneInfoNotFoundError, ValueError):
+        now = datetime.now(timezone.utc)
+    embed.set_footer(text=f"{now:%d %b %Y} · Recent verified headlines")
+    names = [_short_news_text(_news_source_text(query).title() or "News", 80) for query in topics]
+    # Discord caps fields at 1,024 characters and the entire embed at 6,000.
+    field_limit = min(1024, (6000 - len(embed) - sum(map(len, names))) // len(topics))
+    for name, (text, results) in zip(names, sections):
+        if not results:
+            text = "No verified headlines available for this section right now."
+        links = []
+        if include_links:
+            for index, item in enumerate(results, 1):
+                link = f"[{index}] <{item.url}>"
+                if sum(len(line) + 1 for line in links) + len(link) <= field_limit - 162:
+                    links.append(link)
+        suffix = "\n\n" + "\n".join(links) if links else ""
+        value = _short_news_text(text, field_limit - len(suffix)) + suffix
+        embed.add_field(name=name, value=value, inline=False)
+    return embed
 
 
 async def execute_owner_intent(
@@ -195,10 +303,10 @@ async def _execute_intent(message: discord.Message, owner_intent: intent.OwnerIn
             return True
 
         if name == "news":
-            text = await build_news_briefing(owner_intent.query or None, include_links=requests_links(message.content),
-                                             language_request=message.content)
-            if text:
-                sent = await message.reply(text, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
+            briefing = await build_news_briefing(owner_intent.query or None, include_links=requests_links(message.content),
+                                                 language_request=message.content)
+            if briefing:
+                sent = await message.reply(embed=briefing, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
                 await _remember_result(sent, f"News briefing delivered: {owner_intent.query or ', '.join(config.MORNING_NEWS_TOPICS)}")
             else:
                 await reply_discreetly(message, name, "no_verified_results")

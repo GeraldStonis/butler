@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import config
 from cogs.chat import ChatCog
-from services import actions, avatar_edits, database as db, intent, media, memory, music, social
+from services import actions, avatar_edits, database as db, intent, media, memory, music, search, social
 
 
 class GuestRequestTests(unittest.IsolatedAsyncioTestCase):
@@ -76,11 +76,16 @@ class GuestRequestTests(unittest.IsolatedAsyncioTestCase):
             ('nixi search latest space discoveries', 'web_search'),
             ('nixi get the morning news', 'news_search'),
         ]):
-            with self.subTest(text=text), patch(f'services.actions.search.{provider}', AsyncMock(return_value=[])) as fetch, patch('services.actions.search.summarize_results', AsyncMock(return_value='A grounded answer.')):
+            results = [search.SearchItem('Space discovery', 'https://example.test/discovery', 'A grounded finding.')]
+            with self.subTest(text=text), patch(f'services.actions.search.{provider}', AsyncMock(return_value=results)) as fetch, patch('services.actions.search.summarize_results', AsyncMock(return_value='A grounded answer.')), patch.object(config, 'MORNING_NEWS_TOPICS', ['science']):
                 message = self.message(text, user_id=config.OWNER_ID + index + 1)
                 await self.cog._handle_message(message)
                 fetch.assert_awaited_once()
-                self.assertEqual(message.reply.await_args.args[0], 'A grounded answer.')
+                if provider == 'news_search':
+                    self.assertIn('A grounded answer.', message.reply.await_args.kwargs['embed'].fields[0].value)
+                    self.assertEqual(message.reply.await_args.args, ())
+                else:
+                    self.assertEqual(message.reply.await_args.args[0], 'A grounded answer.')
 
     async def test_guest_writing_and_translation_continue_to_chat(self):
         with patch('cogs.chat.intent.classify_owner_intent', AsyncMock(return_value=intent.OwnerIntent('chat'))):

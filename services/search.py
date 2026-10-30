@@ -5,7 +5,13 @@ from __future__ import annotations
 import logging
 import json
 import re
+import asyncio
+import time
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
 from urllib.parse import quote_plus, urlsplit
 
 import httpx
@@ -17,6 +23,21 @@ from services.response_text import filter_links
 log = logging.getLogger("nixi.search")
 
 BRAVE_BASE = "https://api.search.brave.com/res/v1"
+_NEWS_TOTAL_TIMEOUT_SECONDS = 20
+_NEWS_PROVIDER_TIMEOUT_SECONDS = 6
+_RSS_TIMEOUT_SECONDS = 6
+_RSS_CACHE_SECONDS = 600
+_RSS_MAX_BYTES = 512 * 1024
+_RSS_MAX_AGE = timedelta(hours=48)
+_NEWS_RSS_FEEDS = {
+    "world": ("BBC News", "https://feeds.bbci.co.uk/news/world/rss.xml"),
+    "india": ("BBC News", "https://feeds.bbci.co.uk/news/world/asia/india/rss.xml"),
+    "technology": ("BBC News", "https://feeds.bbci.co.uk/news/technology/rss.xml"),
+    "internet": ("BBC News", "https://feeds.bbci.co.uk/news/technology/rss.xml"),
+    "cybersecurity": ("The Hacker News", "https://feeds.feedburner.com/TheHackersNews"),
+}
+_rss_cache: dict[str, tuple[float, list[tuple[datetime, "SearchItem"]]]] = {}
+_rss_fetches: dict[str, asyncio.Task] = {}
 
 
 @dataclass
@@ -96,22 +117,169 @@ async def web_search(query: str, count: int = 5) -> list[SearchItem]:
 
 
 async def news_search(query: str, count: int = 8) -> list[SearchItem]:
-    """Search the past day's news."""
-    if config.TAVILY_API_KEY:
-        return _tavily_items(await _tavily_search(query, count, news=True))
-    data = await _brave_get("/news/search", {"q": query, "count": count, "freshness": "pd"})
-    if not data:
+    """Search recent news, with publisher feeds for the configured briefing topics."""
+    count = max(0, min(count, 20))
+    if not count:
         return []
-    results = data.get("results", [])
-    return [
-        SearchItem(
-            title=item.get("title", "Untitled"),
-            url=item.get("url", ""),
-            description=item.get("description", ""),
-        )
-        for item in results
-        if item.get("url")
-    ]
+    try:
+        async with asyncio.timeout(_NEWS_TOTAL_TIMEOUT_SECONDS):
+            if config.TAVILY_API_KEY:
+                try:
+                    data = await asyncio.wait_for(
+                        _tavily_search(query, count, news=True), _NEWS_PROVIDER_TIMEOUT_SECONDS)
+                    items = _tavily_items(data)
+                    if items:
+                        return items[:count]
+                    log.info("News provider returned no results: provider=tavily")
+                except Exception as exc:
+                    _log_news_failure("tavily", exc)
+            if config.BRAVE_SEARCH_API_KEY:
+                try:
+                    data = await asyncio.wait_for(
+                        _brave_get("/news/search", {"q": query, "count": count, "freshness": "pd"}),
+                        _NEWS_PROVIDER_TIMEOUT_SECONDS)
+                    items = [SearchItem(title=item.get("title") or "Untitled", url=item["url"],
+                                        description=item.get("description") or "")
+                             for item in (data or {}).get("results", []) if item.get("url")]
+                    if items:
+                        return items[:count]
+                    log.info("News provider returned no results: provider=brave")
+                except Exception as exc:
+                    _log_news_failure("brave", exc)
+            return await _rss_news_search(query, count)
+    except TimeoutError:
+        log.warning("News provider chain exceeded its %ss time limit", _NEWS_TOTAL_TIMEOUT_SECONDS)
+        return []
+
+
+def _log_news_failure(provider: str, exc: Exception) -> None:
+    # Exception messages can contain request URLs or provider credentials.
+    status = getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
+    log.warning("News provider failed: provider=%s error=%s HTTP %s", provider, type(exc).__name__, status)
+
+
+class _FeedText(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.hidden = 0
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag in {"script", "style"}:
+            self.hidden += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style"}:
+            self.hidden = max(0, self.hidden - 1)
+
+    def handle_data(self, data: str) -> None:
+        if not self.hidden:
+            self.parts.append(data)
+
+
+def _feed_text(value: str) -> str:
+    parser = _FeedText()
+    parser.feed(value)
+    return " ".join(" ".join(parser.parts).split())
+
+
+def _valid_feed_url(value: str) -> bool:
+    try:
+        url = urlsplit(value)
+        return (url.scheme in {"https", "http"} and bool(url.hostname)
+                and not url.username and not url.password and len(value) <= 700
+                and not any(c.isspace() or ord(c) < 32 or c in '<>"' for c in value))
+    except ValueError:
+        return False
+
+
+def _parse_news_feed(content: bytes, source: str) -> list[tuple[datetime, SearchItem]]:
+    if len(content) > _RSS_MAX_BYTES or b"<!DOCTYPE" in content.upper() or b"<!ENTITY" in content.upper():
+        raise ValueError("Unsupported RSS document")
+    root = ET.fromstring(content)
+    now = datetime.now(timezone.utc)
+    items = []
+    seen = set()
+    for node in root.findall("./channel/item")[:200]:
+        try:
+            published = parsedate_to_datetime(node.findtext("pubDate") or "")
+            if published.tzinfo is None:
+                continue
+            published = published.astimezone(timezone.utc)
+        except (ValueError, TypeError, OverflowError):
+            continue
+        if not timedelta(0) <= now - published <= _RSS_MAX_AGE:
+            continue
+        url = (node.findtext("link") or "").strip()
+        title = _feed_text(node.findtext("title") or "")[:250]
+        if not title or not _valid_feed_url(url) or url in seen:
+            continue
+        description = _feed_text(node.findtext("description") or "")[:3500]
+        items.append((published, SearchItem(title, url, f"{source}: {description}")))
+        seen.add(url)
+    return sorted(items, key=lambda item: item[0], reverse=True)
+
+
+async def _fetch_news_feed(source: str, url: str) -> list[tuple[datetime, SearchItem]]:
+    try:
+        async with asyncio.timeout(_RSS_TIMEOUT_SECONDS):
+            async with httpx.AsyncClient(timeout=5, follow_redirects=True) as client:
+                async with client.stream("GET", url) as response:
+                    response.raise_for_status()
+                    content = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        if len(content) + len(chunk) > _RSS_MAX_BYTES:
+                            raise ValueError("RSS response is too large")
+                        content.extend(chunk)
+            items = _parse_news_feed(bytes(content), source)
+        _rss_cache[url] = (time.monotonic() + _RSS_CACHE_SECONDS, items)
+        return items
+    except Exception as exc:
+        _log_news_failure("rss", exc)
+        # Failed feeds get a short cooldown; successful feeds are cached ten minutes.
+        _rss_cache[url] = (time.monotonic() + 60, [])
+        return []
+
+
+async def _cached_news_feed(source: str, url: str) -> list[SearchItem]:
+    cached = _rss_cache.get(url)
+    if cached is not None and cached[0] > time.monotonic():
+        rows = cached[1]
+    else:
+        task = _rss_fetches.get(url)
+        if task is None:
+            task = asyncio.create_task(_fetch_news_feed(source, url))
+            _rss_fetches[url] = task
+
+            def finished(done: asyncio.Task) -> None:
+                if _rss_fetches.get(url) is done:
+                    _rss_fetches.pop(url, None)
+
+            task.add_done_callback(finished)
+        # One cancelled caller must not cancel a fetch shared by two news sections.
+        rows = await asyncio.shield(task)
+    now = datetime.now(timezone.utc)
+    return [item for published, item in rows if timedelta(0) <= now - published <= _RSS_MAX_AGE]
+
+
+async def _rss_news_search(query: str, count: int) -> list[SearchItem]:
+    topics = [part.strip().casefold() for part in query.split(",")]
+    # Never answer a specific failed search with unrelated general headlines.
+    if not topics or any(topic not in _NEWS_RSS_FEEDS for topic in topics):
+        return []
+    feeds = list(dict.fromkeys(_NEWS_RSS_FEEDS[topic] for topic in topics))
+    groups = await asyncio.gather(*(_cached_news_feed(source, url) for source, url in feeds))
+    items: list[SearchItem] = []
+    seen = set()
+    # Round-robin keeps every requested section represented in combined briefings.
+    for index in range(max((len(group) for group in groups), default=0)):
+        for group in groups:
+            if index < len(group) and group[index].url not in seen:
+                items.append(group[index])
+                seen.add(group[index].url)
+                if len(items) >= count:
+                    return items
+    return items
 
 
 async def image_search(query: str, count: int = 6) -> list[SearchItem]:

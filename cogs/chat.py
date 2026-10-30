@@ -18,7 +18,7 @@ from discord.ext import commands
 import config
 from services import actions, database as db, emoji_filter, intent, llm, memory
 from services.response_text import FALLBACK_REACTION, requests_links
-from services import social, conversation, avatar_edits, charm, opinions, reply_target
+from services import social, conversation, avatar_edits, charm, opinions, reply_target, shipping
 
 log = logging.getLogger("nixi.chat")
 
@@ -180,6 +180,16 @@ class ChatCog(commands.Cog):
             return
 
         mode = await self._detect_mode(message)
+        preference_scope = guild_id if guild_id is not None else 0
+        updates = social.preference_updates(content) if mode != "OWNER_UNAVAILABLE" else {}
+        if mode is None:
+            # A literal self opt-out must work even when Nixi was not addressed.
+            updates = {key: value for key, value in updates.items() if key == "shipping"}
+        if updates:
+            await db.set_member_preferences(preference_scope, message.author.id, updates)
+        observed_pair = await shipping.observe(message, reply_to=reply_to)
+        if observed_pair is not None and guild_id is not None:
+            memory.background(shipping.review_pair(guild_id, *observed_pair))
         if memory.has_member_fact_candidate(content):
             memory.queue_member_learning(
                 channel_id=message.channel.id,
@@ -191,10 +201,6 @@ class ChatCog(commands.Cog):
             )
         if mode is None:
             return
-        preference_scope = guild_id if guild_id is not None else 0
-        updates = social.preference_updates(content) if mode != "OWNER_UNAVAILABLE" else {}
-        if updates:
-            await db.set_member_preferences(preference_scope, message.author.id, updates)
         preferences = await db.get_member_preferences(preference_scope, message.author.id)
 
         if opinions.can_observe(message, mode):
@@ -212,6 +218,11 @@ class ChatCog(commands.Cog):
                 "Say 'nixi stop editing my avatar' to opt out."
                 if updates["avatar_edits"] else "Avatar edits disabled for you."
             )
+        elif "shipping" in updates:
+            fixed_reply = (
+                "Playful shipping enabled for you again."
+                if updates["shipping"] else "Got it. I won't include you in ships."
+            )
         if mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"}:
             if fixed_reply is None and message.author.id != config.OWNER_ID:
                 guest_kind = await social.classify_guest_message(content)
@@ -224,6 +235,9 @@ class ChatCog(commands.Cog):
                     and time.monotonic() - self._greetings.get(greeting_key, -1000) > 600):
                 fixed_reply = "Missed me?"
                 self._greetings[greeting_key] = time.monotonic()
+        if (fixed_reply is None and mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"}
+                and await shipping.handle_request(message, reply_to=reply_to)):
+            return
         routed_intent = None
         if (fixed_reply is None and config.ENABLE_NATURAL_OWNER_ACTIONS
                 and mode in {"DIRECT_ADDRESS", "REPLY_CHAIN"}

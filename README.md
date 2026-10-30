@@ -51,6 +51,21 @@ The key design rule is simple:
   filtering yields no text, a small reaction keeps the owner from getting silence.
 - Short, same-person follow-ups continue for up to 90 seconds without another
   mention, limited to two follow-ups. Another speaker breaks that continuation.
+- Playful love ships use light sentiment analysis of observed public member-to-member
+  replies and direct mentions. Ask "nixi who loves who?", "nixi ship me" or
+  "nixi who would be perfect for @user?". Candidates and their order stay consistent
+  across phrasings and restarts; meaningful new interactions can revise them, with
+  Nixi acknowledging that recent developments changed his view. Ships are guesses
+  about conversational chemistry, not claims of real attraction or compatibility;
+  one-sided warmth does not establish mutual interest. Without enough evidence,
+  Nixi says so. A member can say "stop shipping me" or "don't ship me" to opt out,
+  and "you can ship me again" to re-enable it; these literal self boundaries work
+  without addressing Nixi. Both participants' flirting and setup boundaries apply.
+  Learning starts with new public interactions after deployment. A pair needs at
+  least two distinct messages from each person. Background reviews use up to 12
+  recent exchanges, after four new messages and at most once per 15 minutes per
+  pair; explicit rejection removes a ship immediately. Tables are created
+  automatically in the existing SQLite database; no new API key is required.
 - A shorter persona, bounded recent context, and one regeneration for near-duplicate
   casual replies reduce recycled lines. Serious questions and explanations keep their
   substance instead of being rewritten merely for novelty. No guarantee that a model
@@ -449,7 +464,10 @@ IMGFLIP_API_KEY=
 ```
 
 Tavily powers web/news/image search. Brave is an optional legacy alternative
-used when Tavily is not configured. GIFs first try GIPHY; Tenor remains a legacy
+used when Tavily is not configured, and a news backup when Tavily fails.
+Morning news also falls back to public publisher RSS feeds for the supported
+World, India, Technology, Internet and Cybersecurity topics, without an API key.
+GIFs first try GIPHY; Tenor remains a legacy
 option when GIPHY is not configured. Missing/rejected credentials, empty searches
 and provider failures can fall back to free [nekos.best action GIFs](https://docs.nekos.best/getting-started/introduction.html),
 then actual `.gif` results from the existing image-search provider. Static images
@@ -525,6 +543,24 @@ STICKER_SPAM_ENABLED=false
 STICKER_SPAM_CHANNEL_ID=
 STICKER_SPAM_INTERVAL_SECONDS=60
 ```
+
+Morning news posts once per local day at the configured time, catching up if the
+worker starts later. It uses a dated Discord embed with a separate full-width
+section for each configured topic (up to six). Direct news requests use the same
+format. The destination requires View Channel, Send Messages and Embed Links.
+If the summary model is unavailable, fetched headlines and descriptions still
+appear. A failed topic does not discard the other sections; no verified news at
+all leaves the day unsent and retries after five minutes. Delivery receipts are
+saved before optional conversation logging to avoid duplicate briefings.
+
+Tavily HTTP 432 means its plan usage limit has been exceeded. Nixi logs the
+provider status without credentials, then tries Brave if configured and the
+supported public RSS feeds. RSS items must be dated within the past 48 hours;
+feeds are cached briefly. Unknown custom topics still require a working search
+provider. Startup logs show the effective news channel, time, timezone and
+topics. Keep `MORNING_NEWS_ENABLED=true` and your existing news channel in Railway
+Variables, then redeploy for these changes; editing local `.env` does not update
+Railway. The existing SQLite volume preserves once-daily delivery receipts.
 
 Dead-chat waits start at `DEAD_CHAT_IDLE_SECONDS`, then double after each
 unanswered nudge (1, 2, 4 minutes by default, and so on). Each wait is measured from

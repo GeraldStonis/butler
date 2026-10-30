@@ -19,6 +19,7 @@ from services.response_text import filter_links
 
 log = logging.getLogger("nixi.housekeeping")
 DEAD_CHAT_MESSAGE_TTL_SECONDS = 24 * 60 * 60
+MORNING_NEWS_RETRY_SECONDS = 5 * 60
 
 DEAD_CHAT_EXAMPLES = (
     "ded chat. {member}, all that aura and not one conversation. Say something.",
@@ -144,6 +145,11 @@ class HousekeepingCog(commands.Cog):
     @housekeeping_loop.before_loop
     async def before_housekeeping(self) -> None:
         await self.bot.wait_until_ready()
+        log.info("Morning-news settings: enabled=%s channel=%d time=%s timezone=%s topics=%s search=%s (publisher RSS fallback)",
+                 config.MORNING_NEWS_ENABLED, config.MORNING_NEWS_CHANNEL_ID,
+                 config.MORNING_NEWS_TIME, config.MORNING_NEWS_TIMEZONE,
+                 config.MORNING_NEWS_TOPICS,
+                 "Tavily" if config.TAVILY_API_KEY else "Brave" if config.BRAVE_SEARCH_API_KEY else "not configured")
         log.info("Dead-chat settings: enabled=%s channels=%s base=%ds preferred_user=%d chance=%.2f excluded_users=%s quiet=%s timezone=%s cap=5",
                  config.DEAD_CHAT_ENABLED, config.DEAD_CHAT_CHANNEL_IDS, config.DEAD_CHAT_IDLE_SECONDS,
                  config.DEAD_CHAT_PREFERRED_USER_ID, config.DEAD_CHAT_PREFERRED_CHANCE,
@@ -185,13 +191,23 @@ class HousekeepingCog(commands.Cog):
 
         try:
             tz = ZoneInfo(config.MORNING_NEWS_TIMEZONE)
-        except ZoneInfoNotFoundError:
+        except (ZoneInfoNotFoundError, ValueError):
             log.warning("Unknown MORNING_NEWS_TIMEZONE: %s", config.MORNING_NEWS_TIMEZONE)
             return
 
         now = datetime.now(tz)
         today_key = now.strftime("%Y-%m-%d")
         state_key = f"morning_news_sent:{config.MORNING_NEWS_CHANNEL_ID}"
+        retry_key = f"morning_news_retry:{config.MORNING_NEWS_CHANNEL_ID}"
+        delivered = (config.MORNING_NEWS_CHANNEL_ID, today_key)
+        if getattr(self, "_morning_news_delivered", None) == delivered:
+            # Discord accepted this post; retry a failed receipt write, never its delivery.
+            try:
+                await db.set_state(state_key, today_key)
+                self._morning_news_delivered = None
+            except Exception as exc:
+                log.warning("Morning news receipt could not be saved (%s); delivery will not repeat", type(exc).__name__)
+            return
         if await db.get_state(state_key) == today_key:
             return
 
@@ -206,17 +222,50 @@ class HousekeepingCog(commands.Cog):
         if (now.hour, now.minute) < (hour, minute):
             return
 
-        channel = self.bot.get_channel(config.MORNING_NEWS_CHANNEL_ID)
-        if not isinstance(channel, discord.TextChannel):
-            log.warning("Morning news channel not found: %d", config.MORNING_NEWS_CHANNEL_ID)
+        try:
+            next_attempt = float(await db.get_state(retry_key) or 0)
+        except (ValueError, TypeError):
+            next_attempt = 0
+        if time.time() < next_attempt:
             return
 
-        briefing = await actions.build_news_briefing()
-        if not briefing.strip():
+        try:
+            channel = self.bot.get_channel(config.MORNING_NEWS_CHANNEL_ID)
+            if channel is None:
+                channel = await self.bot.fetch_channel(config.MORNING_NEWS_CHANNEL_ID)
+            if not isinstance(channel, discord.TextChannel):
+                raise ValueError("Configured channel is not a server text channel")
+            permissions = channel.permissions_for(channel.guild.me)
+            if not (permissions.view_channel and permissions.send_messages and permissions.embed_links):
+                raise PermissionError("Morning news requires View Channel, Send Messages and Embed Links")
+            briefing = await actions.build_news_briefing()
+            if not briefing:
+                log.warning("Morning news has no verified headlines in channel %d; retrying in %ds",
+                            channel.id, MORNING_NEWS_RETRY_SECONDS)
+                await db.set_state(retry_key, str(time.time() + MORNING_NEWS_RETRY_SECONDS))
+                return
+            sent = await channel.send(embed=briefing, allowed_mentions=discord.AllowedMentions.none())
+        except Exception as exc:
+            # Provider exception URLs can contain credentials; log only type and status.
+            log.warning("Morning news delivery failed (%s, HTTP %s) for channel %d; retrying in %ds",
+                        type(exc).__name__, getattr(exc, "status", None),
+                        config.MORNING_NEWS_CHANNEL_ID, MORNING_NEWS_RETRY_SECONDS)
+            await db.set_state(retry_key, str(time.time() + MORNING_NEWS_RETRY_SECONDS))
             return
-        sent = await channel.send(briefing)
-        await memory.log_delivery(sent)
-        await db.set_state(state_key, today_key)
+
+        self._morning_news_delivered = delivered
+        try:
+            await db.set_state(state_key, today_key)
+        except Exception as exc:
+            log.warning("Morning news was delivered, but receipt could not be saved (%s); retrying receipt only", type(exc).__name__)
+            return
+        self._morning_news_delivered = None
+        await db.set_state(retry_key, "0")
+        try:
+            await memory.log_delivery(sent)
+        except Exception as exc:
+            log.warning("Morning news was delivered, but memory logging failed (%s)", type(exc).__name__)
+        log.info("Morning news delivered in channel %d for %s", channel.id, today_key)
 
     async def _maybe_nudge_dead_chat(self) -> None:
         if not config.DEAD_CHAT_ENABLED or engagement.dead_chat_quiet_now():

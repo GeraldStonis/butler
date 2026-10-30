@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 
 import config
-from services import llm, avatar_edits, conversation
+from services import llm, avatar_edits, conversation, shipping
 
 
 ACTION_PATTERNS = {
@@ -215,6 +215,8 @@ def _song_request(text: str) -> OwnerIntent | None:
 
 def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | None:
     """Catch common requests without spending an LLM call."""
+    if shipping.asks_shipping(text):
+        return OwnerIntent("chat")
     mentions = mentions or []
     cleaned = _actionable_text(text)
     if cleaned is None:
@@ -274,8 +276,11 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
         return OwnerIntent("action_gif", action=action, target_user_id=reaction_target_id)
 
     if re.search(r"\b(morning news|news briefing|today'?s news|headlines)\b", lower):
-        topic = re.sub(r"\b(fetch|get|give|me|the|morning|news|briefing|headlines|today'?s)\b", "", lower)
-        return OwnerIntent("news", query=topic.strip() or ", ".join(config.MORNING_NEWS_TOPICS))
+        topic = re.sub(r"\b(?:can|could|would|will)\s+you\b", "", lower)
+        topic = re.sub(r"\b(?:fetch|get|give|me|us|the|morning|news|briefing|headlines|today'?s|please|pls)\b", "", topic)
+        topic = re.sub(r"\s+", " ", topic).strip(" ,.!?:;")
+        topic = re.sub(r"^(?:about|on|for)\s+", "", topic)
+        return OwnerIntent("news", query=topic)
 
     if re.search(r"\b(?:caption(?:ed)?\s+(?:an?\s+|this\s+)?gifs?|gifs?\s+(?:memes?|with\s+(?:a\s+)?caption))\b", lower):
         return OwnerIntent("captioned_gif", query=cleaned)

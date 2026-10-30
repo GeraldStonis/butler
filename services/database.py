@@ -14,11 +14,12 @@ import config
 
 _db: aiosqlite.Connection | None = None
 _init_lock = asyncio.Lock()
+_ship_write_lock = asyncio.Lock()
 
 
 async def get_db() -> aiosqlite.Connection:
     """Return the singleton database connection, initialising if needed."""
-    global _db
+    global _db, _ship_write_lock
     async with _init_lock:
         if _db is None:
             connection = await aiosqlite.connect(config.DB_PATH)
@@ -31,6 +32,7 @@ async def get_db() -> aiosqlite.Connection:
                 await connection.close()
                 raise
             _db = connection
+            _ship_write_lock = asyncio.Lock()
     return _db
 
 
@@ -149,6 +151,7 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             avatar_edits INTEGER NOT NULL DEFAULT 1,
             flirting INTEGER NOT NULL DEFAULT 1,
             introductions INTEGER NOT NULL DEFAULT 1,
+            shipping INTEGER NOT NULL DEFAULT 1,
             PRIMARY KEY (guild_id, user_id)
         );
         CREATE TABLE IF NOT EXISTS reaction_gif_history (
@@ -201,6 +204,38 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_member_impression_samples
             ON member_impression_samples (guild_id, user_id, id);
+
+        CREATE TABLE IF NOT EXISTS ship_pairs (
+            guild_id INTEGER NOT NULL,
+            low_id INTEGER NOT NULL,
+            high_id INTEGER NOT NULL,
+            low_affinity INTEGER NOT NULL DEFAULT 0 CHECK (low_affinity BETWEEN -2 AND 2),
+            high_affinity INTEGER NOT NULL DEFAULT 0 CHECK (high_affinity BETWEEN -2 AND 2),
+            tone TEXT NOT NULL DEFAULT 'neutral'
+                CHECK (tone IN ('warmth', 'affection', 'support', 'playful', 'neutral', 'boundary')),
+            interaction_count INTEGER NOT NULL DEFAULT 0,
+            reviewed_count INTEGER NOT NULL DEFAULT 0,
+            next_review_at REAL NOT NULL DEFAULT 0,
+            updated_at REAL NOT NULL DEFAULT 0,
+            PRIMARY KEY (guild_id, low_id, high_id),
+            CHECK (low_id < high_id)
+        );
+        CREATE TABLE IF NOT EXISTS ship_samples (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER NOT NULL,
+            low_id INTEGER NOT NULL,
+            high_id INTEGER NOT NULL,
+            channel_id INTEGER NOT NULL,
+            message_id INTEGER NOT NULL,
+            author_id INTEGER NOT NULL,
+            target_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            UNIQUE (guild_id, channel_id, message_id),
+            CHECK (low_id < high_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_ship_samples_pair
+            ON ship_samples (guild_id, low_id, high_id, id);
     """)
     cursor = await db.execute("PRAGMA table_info(channel_activity)")
     columns = {row["name"] for row in await cursor.fetchall()}
@@ -213,7 +248,7 @@ async def _create_tables(db: aiosqlite.Connection) -> None:
             await db.execute(f"ALTER TABLE channel_activity ADD COLUMN {name} {definition}")
     cursor = await db.execute("PRAGMA table_info(member_preferences)")
     preference_columns = {row["name"] for row in await cursor.fetchall()}
-    for name in ("avatar_edits", "flirting", "introductions"):
+    for name in ("avatar_edits", "flirting", "introductions", "shipping"):
         if name not in preference_columns:
             await db.execute(f"ALTER TABLE member_preferences ADD COLUMN {name} INTEGER NOT NULL DEFAULT 1")
     cursor = await db.execute("PRAGMA table_info(messages)")
@@ -496,9 +531,9 @@ async def activity_leaderboard(guild_id: int) -> list[dict]:
 
 async def get_member_preferences(guild_id: int, user_id: int) -> dict[str, bool]:
     connection = await get_db()
-    cursor = await connection.execute("SELECT roasting, media, pings, avatar_edits, flirting, introductions FROM member_preferences WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+    cursor = await connection.execute("SELECT roasting, media, pings, avatar_edits, flirting, introductions, shipping FROM member_preferences WHERE guild_id=? AND user_id=?", (guild_id, user_id))
     row = await cursor.fetchone()
-    return {key: bool(row[key]) if row else True for key in ("roasting", "media", "pings", "avatar_edits", "flirting", "introductions")}
+    return {key: bool(row[key]) if row else True for key in ("roasting", "media", "pings", "avatar_edits", "flirting", "introductions", "shipping")}
 
 
 async def set_member_preferences(guild_id: int, user_id: int, updates: dict[str, bool]) -> None:
@@ -506,7 +541,7 @@ async def set_member_preferences(guild_id: int, user_id: int, updates: dict[str,
     # Specify the default explicitly: older databases may still declare DEFAULT 0.
     await connection.execute("INSERT OR IGNORE INTO member_preferences (guild_id,user_id,avatar_edits) VALUES (?,?,1)", (guild_id, user_id))
     for key, value in updates.items():
-        if key in {"roasting", "media", "pings", "avatar_edits", "flirting", "introductions"} and isinstance(value, bool):
+        if key in {"roasting", "media", "pings", "avatar_edits", "flirting", "introductions", "shipping"} and isinstance(value, bool):
             await connection.execute(f"UPDATE member_preferences SET {key}=? WHERE guild_id=? AND user_id=?", (int(value), guild_id, user_id))
     await connection.commit()
 
@@ -730,6 +765,126 @@ async def list_member_impressions(guild_id: int, since: float, *, least: bool = 
             WHERE i.guild_id=? AND i.impression!='' AND i.updated_at>=?
             AND (i.affinity>=0 OR COALESCE(p.roasting, 1)=1)
             ORDER BY i.affinity {direction}, i.updated_at DESC LIMIT 12""", (guild_id, since),
+    )
+    return [dict(row) for row in await cursor.fetchall()]
+
+
+def _canonical_ship_pair(first_id: int, second_id: int) -> tuple[int, int]:
+    if first_id == second_id:
+        raise ValueError("A ship requires two different members")
+    return min(first_id, second_id), max(first_id, second_id)
+
+
+async def record_ship_sample(
+    guild_id: int, channel_id: int, message_id: int, author_id: int,
+    target_id: int, content: str, now: float,
+) -> bool:
+    """Keep twelve recent, distinct directed exchanges per canonical pair."""
+    if author_id == target_id:
+        return False
+    low_id, high_id = _canonical_ship_pair(author_id, target_id)
+    db = await get_db()
+    # Keep the novelty check, count increment, and bounded retention together.
+    async with _ship_write_lock:
+        await db.execute(
+            """DELETE FROM ship_samples WHERE guild_id=? AND low_id=? AND high_id=?
+               AND created_at<?""", (guild_id, low_id, high_id, now - 30 * 86400),
+        )
+        cursor = await db.execute(
+            """INSERT OR IGNORE INTO ship_samples
+               (guild_id, low_id, high_id, channel_id, message_id, author_id, target_id, content, created_at)
+               SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+               WHERE NOT EXISTS (
+                   SELECT 1 FROM ship_samples WHERE guild_id=? AND low_id=? AND high_id=?
+                   AND author_id=? AND target_id=? AND content=?
+               )""",
+            (guild_id, low_id, high_id, channel_id, message_id, author_id, target_id, content, now,
+             guild_id, low_id, high_id, author_id, target_id, content),
+        )
+        inserted = cursor.rowcount == 1
+        if inserted:
+            await db.execute(
+                """INSERT INTO ship_pairs (guild_id, low_id, high_id, interaction_count)
+                   VALUES (?, ?, ?, 1) ON CONFLICT(guild_id, low_id, high_id) DO UPDATE SET
+                   interaction_count=interaction_count+1""", (guild_id, low_id, high_id),
+            )
+            await db.execute(
+                """DELETE FROM ship_samples WHERE guild_id=? AND low_id=? AND high_id=?
+                   AND id NOT IN (
+                       SELECT id FROM ship_samples WHERE guild_id=? AND low_id=? AND high_id=?
+                       ORDER BY id DESC LIMIT 12
+                   )""", (guild_id, low_id, high_id, guild_id, low_id, high_id),
+            )
+        await db.commit()
+        return inserted
+
+
+async def get_ship_samples(guild_id: int, low_id: int, high_id: int, since: float) -> list[dict]:
+    low_id, high_id = _canonical_ship_pair(low_id, high_id)
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT message_id, channel_id, author_id, target_id, content, created_at
+           FROM ship_samples WHERE guild_id=? AND low_id=? AND high_id=? AND created_at>=?
+           ORDER BY id""", (guild_id, low_id, high_id, since),
+    )
+    return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_ship_pair(guild_id: int, low_id: int, high_id: int) -> dict | None:
+    low_id, high_id = _canonical_ship_pair(low_id, high_id)
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM ship_pairs WHERE guild_id=? AND low_id=? AND high_id=?",
+        (guild_id, low_id, high_id),
+    )
+    row = await cursor.fetchone()
+    return dict(row) if row else None
+
+
+async def claim_ship_review(guild_id: int, low_id: int, high_id: int, now: float) -> bool:
+    """Atomically reserve one review after four new exchanges and fifteen minutes."""
+    low_id, high_id = _canonical_ship_pair(low_id, high_id)
+    db = await get_db()
+    cursor = await db.execute(
+        """UPDATE ship_pairs SET reviewed_count=interaction_count, next_review_at=?
+           WHERE guild_id=? AND low_id=? AND high_id=? AND interaction_count-reviewed_count>=4
+           AND next_review_at<=?""", (now + 900, guild_id, low_id, high_id, now),
+    )
+    await db.commit()
+    return cursor.rowcount == 1
+
+
+async def save_ship_pair(
+    guild_id: int, low_id: int, high_id: int, low_affinity: int,
+    high_affinity: int, tone: str, now: float,
+) -> None:
+    """Persist directional affinity while keeping counters and review reservations."""
+    if any(type(value) is not int or not -2 <= value <= 2 for value in (low_affinity, high_affinity)):
+        raise ValueError("Ship affinities must be integers between -2 and 2")
+    if tone not in {"warmth", "affection", "support", "playful", "neutral", "boundary"}:
+        raise ValueError("Unsupported ship tone")
+    if low_id > high_id:
+        low_affinity, high_affinity = high_affinity, low_affinity
+    low_id, high_id = _canonical_ship_pair(low_id, high_id)
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO ship_pairs
+           (guild_id, low_id, high_id, low_affinity, high_affinity, tone, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(guild_id, low_id, high_id) DO UPDATE SET
+           low_affinity=excluded.low_affinity, high_affinity=excluded.high_affinity,
+           tone=excluded.tone, updated_at=excluded.updated_at""",
+        (guild_id, low_id, high_id, low_affinity, high_affinity, tone, now),
+    )
+    await db.commit()
+
+
+async def list_ship_pairs(guild_id: int, since: float) -> list[dict]:
+    """Return reviewed pairs in a stable order, within this guild and time window."""
+    db = await get_db()
+    cursor = await db.execute(
+        """SELECT * FROM ship_pairs WHERE guild_id=? AND updated_at>0 AND updated_at>=?
+           ORDER BY low_id, high_id""", (guild_id, since),
     )
     return [dict(row) for row in await cursor.fetchall()]
 
