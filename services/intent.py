@@ -82,7 +82,7 @@ def _actionable_text(text: str) -> str | None:
     negative = re.search(
         r"\b(?:don't|dont|do not|never|stop|avoid)\s+(?:(?:you|please|ever)\s+)*"
         r"(?:send(?:ing)?|serv(?:e|ing)|play(?:ing)?|start(?:ing)?|find(?:ing)?|fetch(?:ing)?|"
-        r"post(?:ing)?|shar(?:e|ing)|giv(?:e|ing)|get(?:ting)?|show(?:ing)?|"
+        r"post(?:ing)?|drop(?:ping)?|shar(?:e|ing)|giv(?:e|ing)|get(?:ting)?|show(?:ing)?|"
         r"brew(?:ing)?|bring(?:ing)?|pour(?:ing)?|search(?:ing)?|hug(?:ging)?|punch(?:ing)?|"
         r"kiss(?:ing)?|(?:jump|dance|laugh|clap|hit|kick|slap|run|bow|cry|sleep|nod|spin)\w*|"
         r"edit(?:ting)?|generat(?:e|ing)|make|making|ping(?:ing)?|tag(?:ging)?)\b"
@@ -213,6 +213,34 @@ def _song_request(text: str) -> OwnerIntent | None:
     return OwnerIntent("song", query=query.strip(" \"'"))
 
 
+def news_request(text: str) -> OwnerIntent | None:
+    """Recognize requested briefings independently of the daily news scheduler."""
+    cleaned = _actionable_text(text)
+    if cleaned is None:
+        return None
+    lower = cleaned.casefold().strip(" ,.!?:;")
+    noun = r"(?:news|headlines|khabar|khabrein|khabren|khabre|khabarein)"
+    if (not re.search(rf"\b{noun}\b", lower)
+            or re.fullmatch(rf"what(?:'s| is| are)\s+{noun}", lower)
+            or re.search(r"\b(?:good|bad|big|exciting)\s+news\b", lower)
+            or re.search(r"\b(?:don't|dont|do not|never|stop|avoid|mat)\b", lower)):
+        return None
+    prefix = r"^(?:(?:hey|yo|please|pls|just)\s+)*(?:(?:can|could|would|will)\s+you\s+)?"
+    action = re.match(prefix + r"(?:drop|send|share|post|fetch|get|give|gimme|show|bring|read|tell)\b\s*", lower)
+    bare = re.match(rf"^(?:(?:the|some|morning|today's|todays|today|latest|daily|current|aaj|ki)\s+)*{noun}\b", lower)
+    question = re.match(rf"^what(?:'s| is| are)\s+(?:(?:the|today's|latest|current)\s+)*{noun}\b", lower)
+    hinglish = re.search(r"\b(?:bhej(?:o| do)?|suna(?:o| do)|dikhao|batao)(?:\s+(?:na|please|pls|bhai|yaar))?$", lower)
+    if not (action or bare or question or hinglish):
+        return None
+    topic = lower[action.end():] if action else lower[question.end():] if question else lower
+    topic = re.sub(r"\b(?:with|including)\s+(?:sources|links)\b", "", topic)
+    topic = re.sub(rf"\b(?:{noun}|me|us|the|some|a|an|morning|today's|todays|today|latest|daily|current|briefing|update|roundup|please|pls|now|aaj|ki|ke|abhi|na|bhai|yaar)\b", "", topic)
+    topic = re.sub(r"\b(?:bhej(?:o| do)?|suna(?:o| do)|dikhao|batao)\b", "", topic)
+    topic = re.sub(r"\s+", " ", topic).strip(" ,.!?:;")
+    topic = re.sub(r"^(?:about|on|for)\s+", "", topic)
+    return OwnerIntent("news", query=topic)
+
+
 def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | None:
     """Catch common requests without spending an LLM call."""
     if shipping.asks_shipping(text):
@@ -224,6 +252,9 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
     if cleaned != _strip_bot_name(text.replace("\u2019", "'")):
         mentions = [user for user in mentions if re.search(rf"<@!?{user.id}>", cleaned)]
     lower = cleaned.lower()
+    requested_news = news_request(cleaned)
+    if requested_news:
+        return requested_news
     if conversation.requests_verbatim_text(cleaned) or re.search(
         r"\b(?:your (?:gender|pronouns?)|(?:pick|choose)\s+(?:(?:a|your|one)\s+)?gender)\b"
         r"|\b(?:call|address)\b.{0,100}\bmaster\b", lower,
@@ -274,13 +305,6 @@ def heuristic_intent(text: str, mentions: list | None = None) -> OwnerIntent | N
 
     if action in {"tea", "coffee"} and reaction_target_id and not informational and not negated and not explicit_edit:
         return OwnerIntent("action_gif", action=action, target_user_id=reaction_target_id)
-
-    if re.search(r"\b(morning news|news briefing|today'?s news|headlines)\b", lower):
-        topic = re.sub(r"\b(?:can|could|would|will)\s+you\b", "", lower)
-        topic = re.sub(r"\b(?:fetch|get|give|me|us|the|morning|news|briefing|headlines|today'?s|please|pls)\b", "", topic)
-        topic = re.sub(r"\s+", " ", topic).strip(" ,.!?:;")
-        topic = re.sub(r"^(?:about|on|for)\s+", "", topic)
-        return OwnerIntent("news", query=topic)
 
     if re.search(r"\b(?:caption(?:ed)?\s+(?:an?\s+|this\s+)?gifs?|gifs?\s+(?:memes?|with\s+(?:a\s+)?caption))\b", lower):
         return OwnerIntent("captioned_gif", query=cleaned)

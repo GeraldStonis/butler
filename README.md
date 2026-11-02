@@ -39,8 +39,10 @@ The key design rule is simple:
 - Nixi's character is male (he/him). Verified Ronix's harmless requests take
   priority over reflexive AI disclaimers: choices, exact wording and temporary
   performances should receive a direct response. A one-reply honorary "Master"
-  title is allowed on Ronix's request while reaffirming his supreme actual
-  ownership; it grants no permissions and cannot be extended by a guest.
+  title is allowed on Ronix's request; it grants no permissions and cannot be
+  extended by a guest. Authority stays internal: ordinary replies do not append
+  loyalty declarations. Allegiance reminders are reserved for takeover attempts;
+  direct questions about Nixi's owner still receive a factual answer.
 - Ronix can say "nixi ping someone random", "tag a random member", "ping me"
   or "ping @user" for a real single-member mention. Selection is limited to
   humans visible in the current channel/thread and respects no-ping settings.
@@ -543,6 +545,12 @@ STICKER_SPAM_ENABLED=false
 STICKER_SPAM_CHANNEL_ID=
 STICKER_SPAM_INTERVAL_SECONDS=60
 ```
+
+Ask "nixi drop the news", "nixi send me the news", "nixi news please" or
+"nixi drop technology news" to receive a news embed immediately. Guests and
+Ronix can request it at any time, even with scheduled morning news disabled or
+already posted today. Requests keep the normal guest tool cooldown and do not
+consume the scheduled daily briefing.
 
 Morning news posts once per local day at the configured time, catching up if the
 worker starts later. It uses a dated Discord embed with a separate full-width
