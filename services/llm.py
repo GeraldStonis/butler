@@ -1,18 +1,19 @@
 """
-LLM service — wraps the Ollama Cloud API via the official ollama SDK.
+LLM service using the official asynchronous Groq SDK.
 
-Uses AsyncClient for non-blocking calls within the Discord event loop.
-Connects to https://ollama.com with Bearer token auth.
+All conversational and internal model calls share a bounded request queue,
+deadline, retry policy, and response cleanup.
 """
 
 from __future__ import annotations
 
 import logging
+import math
 import re
 import asyncio
 import json
 import time
-from ollama import AsyncClient
+from groq import APIConnectionError, AsyncGroq
 
 import config
 from services.response_text import (
@@ -22,7 +23,7 @@ from services.response_text import (
 
 log = logging.getLogger("nixi.llm")
 
-_client: AsyncClient | None = None
+_client: AsyncGroq | None = None
 _requests = asyncio.Semaphore(config.LLM_MAX_CONCURRENT)
 
 
@@ -34,15 +35,30 @@ def parse_json(text: str):
     return json.loads(text)
 
 
-def _get_client() -> AsyncClient:
-    """Lazy-initialise the Ollama async client."""
+def _get_client() -> AsyncGroq:
+    """Lazy-initialise Groq; the service owns retries and the overall deadline."""
     global _client
     if _client is None:
-        _client = AsyncClient(
-            host=config.OLLAMA_HOST,
-            headers={"Authorization": f"Bearer {config.OLLAMA_API_KEY}"},
+        _client = AsyncGroq(
+            api_key=config.GROQ_API_KEY,
+            timeout=config.LLM_TIMEOUT_SECONDS,
+            max_retries=0,
         )
     return _client
+
+
+def _retry_delay(exc: Exception) -> float | None:
+    """Read a safe retry delay; the caller enforces the remaining deadline."""
+    status = getattr(exc, "status_code", None)
+    if not (isinstance(exc, APIConnectionError) or status in {408, 409, 429}
+            or isinstance(status, int) and 500 <= status < 600):
+        return None
+    headers = getattr(getattr(exc, "response", None), "headers", {})
+    try:
+        delay = float(headers.get("retry-after", "0.5"))
+    except (ValueError, TypeError):
+        return None
+    return delay if math.isfinite(delay) and delay >= 0 else None
 
 
 async def generate_response(
@@ -64,42 +80,46 @@ async def generate_response(
         Cap reply length. Discord messages max out at 2000 chars; 600 tokens
         keeps replies punchy and in-character.
     """
-    client = _get_client()
     started = time.monotonic()
     try:
-        async with asyncio.timeout(config.LLM_TIMEOUT_SECONDS):
+        client = _get_client()
+        async with asyncio.timeout(config.LLM_TIMEOUT_SECONDS) as deadline:
             async with _requests:
                 kwargs = {}
-                model = config.OLLAMA_MODEL.lower()
-                thinking = config.OLLAMA_THINKING_LEVEL.lower()
+                model = config.GROQ_MODEL.lower()
+                thinking = config.GROQ_REASONING_EFFORT.lower()
                 is_gpt_oss = "gpt-oss" in model
                 request_messages = messages
                 if is_gpt_oss:
-                    # An old Gemma boolean must not silently enable medium reasoning.
-                    kwargs["think"] = thinking if thinking in {"low", "medium", "high"} else "low"
+                    kwargs["reasoning_effort"] = thinking if thinking in {"low", "medium", "high"} else "low"
+                    kwargs["include_reasoning"] = False
                     # Supply one instruction block for Harmony-based serving templates.
                     instructions = [m["content"] for m in messages if m["role"] == "system"]
                     if len(instructions) > 1:
                         request_messages = [{"role": "system", "content": "\n\n".join(instructions)}]
                         request_messages.extend(dict(m) for m in messages if m["role"] != "system")
-                elif "gemma4" in model:
-                    # Gemma uses a boolean, not GPT-OSS's named reasoning levels.
-                    kwargs["think"] = thinking in {"true", "1", "yes", "on"}
                 # GPT-OSS shares this budget between reasoning and the final answer.
                 budget = max(max_tokens, 512) if is_gpt_oss else max_tokens
                 for attempt in range(2):
-                    response = await client.chat(
-                        model=config.OLLAMA_MODEL, messages=request_messages,
-                        options={"temperature": temperature,
-                                 "num_predict": max(budget, 1200) if attempt else budget},
-                        **kwargs,
-                    )
-                    content = response.message.content or ""
+                    try:
+                        response = await client.chat.completions.create(
+                            model=config.GROQ_MODEL, messages=request_messages,
+                            temperature=temperature,
+                            max_completion_tokens=budget,
+                            **kwargs,
+                        )
+                    except Exception as exc:
+                        delay = _retry_delay(exc) if attempt == 0 else None
+                        remaining = deadline.when() - asyncio.get_running_loop().time()
+                        if delay is None or delay >= remaining:
+                            raise
+                        await asyncio.sleep(delay)
+                        continue
+                    content = response.choices[0].message.content if response.choices else ""
+                    content = content or ""
                     if content.strip():
                         # Never deliver reasoning traces or speaker labels.
                         content = re.sub(r"<think>.*?</think>", "", content, flags=re.S).strip()
-                        if not content:
-                            continue
                         if content.startswith("{"):
                             try:
                                 envelope = parse_json(content)
@@ -107,11 +127,16 @@ async def generate_response(
                                     content = envelope["text"].strip()
                             except (ValueError, AttributeError):
                                 pass
-                        log.info("LLM response model=%s elapsed=%.2fs attempts=%d input_tokens=%s output_tokens=%s prompt_chars=%d",
-                                 config.OLLAMA_MODEL, time.monotonic() - started, attempt + 1,
-                                 getattr(response, "prompt_eval_count", None), getattr(response, "eval_count", None),
-                                 sum(len(m["content"]) for m in request_messages))
-                        return re.sub(r"^(?:\[)?Nixi(?:\])?:\s*", "", content, flags=re.I)
+                        content = re.sub(r"^(?:\[)?Nixi(?:\])?:\s*", "", content, flags=re.I).strip()
+                        if content:
+                            usage = getattr(response, "usage", None)
+                            log.info("LLM response provider=groq model=%s elapsed=%.2fs attempts=%d input_tokens=%s output_tokens=%s prompt_chars=%d",
+                                     config.GROQ_MODEL, time.monotonic() - started, attempt + 1,
+                                     getattr(usage, "prompt_tokens", None), getattr(usage, "completion_tokens", None),
+                                     sum(len(m["content"]) for m in request_messages))
+                            return content
+                    # Empty final answers can exhaust the shared reasoning budget.
+                    budget = max(budget, 1200)
         return failure_reply if failure_reply is not None else FALLBACK_REACTION
     except Exception as exc:
         status = getattr(exc, 'status_code', None) or getattr(getattr(exc, 'response', None), 'status_code', None)

@@ -44,7 +44,8 @@ class DiscreetReplyTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('@', reply)
 
     async def test_llm_default_failure_is_not_a_public_error_announcement(self):
-        client = SimpleNamespace(chat=AsyncMock(side_effect=RuntimeError('secret-provider-body')))
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(
+            create=AsyncMock(side_effect=RuntimeError('secret-provider-body')))))
         with patch.object(llm, '_get_client', return_value=client), self.assertLogs('nixi.llm', level='WARNING') as logs:
             reply = await llm.generate_response([{'role': 'user', 'content': 'hello'}])
         self.assertEqual(reply, FALLBACK_REACTION)

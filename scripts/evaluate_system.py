@@ -78,14 +78,14 @@ def local_settings() -> dict:
     numbers = ['DEAD_CHAT_IDLE_SECONDS', 'STICKER_SPAM_INTERVAL_SECONDS', 'MEME_DROP_INTERVAL_SECONDS',
         'AUTOMATIC_MEDIA_CHANCE', 'AUTOMATIC_MEDIA_COOLDOWN_SECONDS', 'CONTEXT_MESSAGE_LIMIT',
         'CONTEXT_CHAR_BUDGET', 'LLM_TIMEOUT_SECONDS', 'LLM_MAX_CONCURRENT']
-    keys = ['OLLAMA_API_KEY', 'TAVILY_API_KEY', 'GIPHY_API_KEY', 'IMGFLIP_API_KEY',
+    keys = ['GROQ_API_KEY', 'TAVILY_API_KEY', 'GIPHY_API_KEY', 'IMGFLIP_API_KEY',
         'CLOUDFLARE_API_TOKEN', 'BRAVE_SEARCH_API_KEY', 'TENOR_API_KEY']
     try:
         config.validate_runtime()
         startup = 'required values present (not an authentication test)'
     except ValueError as exc:
         startup = str(exc)  # validate_runtime only includes setting names.
-    return {'model': config.OLLAMA_MODEL, 'thinking': config.OLLAMA_THINKING_LEVEL,
+    return {'provider': 'groq', 'model': config.GROQ_MODEL, 'reasoning_effort': config.GROQ_REASONING_EFFORT,
         'timezone': config.SERVER_TIMEZONE, 'startup': startup,
         'flags': {name: getattr(config, name) for name in flags},
         'tuning': {name: getattr(config, name) for name in numbers},
@@ -318,7 +318,7 @@ async def model_phase(directory: Path, repeat: int, only: set[str]) -> None:
                 row['error'] = safe_error(exc)
             row['seconds'] = round(time.perf_counter() - started, 3)
             records.append(row)
-            save(directory, 'model', {'model': config.OLLAMA_MODEL, 'thinking': config.OLLAMA_THINKING_LEVEL,
+            save(directory, 'model', {'provider': 'groq', 'model': config.GROQ_MODEL, 'reasoning_effort': config.GROQ_REASONING_EFFORT,
                 'scope': 'Synthetic direct reply/retort paths. No Discord delivery or independent safety certification. Checks are narrow invariants, not semantic judgments.',
                 'cases': records})
             print(json.dumps({'phase': 'model', 'id': case_id, 'iteration': iteration + 1,
@@ -343,7 +343,7 @@ async def model_phase(directory: Path, repeat: int, only: set[str]) -> None:
         except Exception as exc:
             records.append({'id': label, 'error': safe_error(exc)})
     elapsed = [r['seconds'] for r in records if 'seconds' in r]
-    save(directory, 'model', {'model': config.OLLAMA_MODEL, 'thinking': config.OLLAMA_THINKING_LEVEL,
+    save(directory, 'model', {'provider': 'groq', 'model': config.GROQ_MODEL, 'reasoning_effort': config.GROQ_REASONING_EFFORT,
         'scope': 'Synthetic direct reply/retort paths, not real Discord end-to-end tests. Semantic assessment is in the written report.',
         'latency_seconds': {'median': round(statistics.median(elapsed), 3),
                             'max': max(elapsed), 'sum': round(sum(elapsed), 3)}, 'cases': records})

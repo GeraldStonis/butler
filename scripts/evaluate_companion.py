@@ -23,12 +23,14 @@ async def main():
     guild = SimpleNamespace(id=1, members=people, emojis=[])
     try:
         try:
-            options = {'think': 'low'} if 'gpt-oss' in config.OLLAMA_MODEL.lower() else {}
-            await asyncio.wait_for(llm._get_client().chat(model=config.OLLAMA_MODEL,
+            effort = config.GROQ_REASONING_EFFORT.lower()
+            options = ({'reasoning_effort': effort if effort in {'low', 'medium', 'high'} else 'low', 'include_reasoning': False}
+                       if 'gpt-oss' in config.GROQ_MODEL.lower() else {})
+            await asyncio.wait_for(llm._get_client().chat.completions.create(model=config.GROQ_MODEL,
                 messages=[{'role': 'user', 'content': 'Reply only OK.'}],
-                options={'num_predict': 512}, **options), timeout=config.LLM_TIMEOUT_SECONDS)
+                max_completion_tokens=512, temperature=0, **options), timeout=config.LLM_TIMEOUT_SECONDS)
         except Exception as exc:
-            save(directory, 'live_companion', {'status': 'blocked', 'provider': 'ollama',
+            save(directory, 'live_companion', {'status': 'blocked', 'provider': 'groq',
                 'error': safe_error(exc), 'scope': 'Preflight only. No Discord connection or production database access.'})
             print('Live companion probes blocked:', safe_error(exc), flush=True)
             return
@@ -73,7 +75,8 @@ async def main():
                     records.append({'id': f'live_automatic_gif_{index + 1}', 'error': safe_error(exc)})
                 print(f'live_automatic_gif_{index + 1} complete', flush=True)
         save(directory, 'live_companion', {
-            'scope': 'Fictional members only. Existing Ollama model and GIF sources. No Discord sends. '
+            'provider': 'groq', 'model': config.GROQ_MODEL, 'reasoning_effort': config.GROQ_REASONING_EFFORT,
+            'scope': 'Fictional members only. Configured Groq model and GIF sources. No Discord sends. '
                      'Automatic-media sampling forced to 100% for relevance/provider probes, not a production frequency measurement. '
                      'Substring checks are narrow signals; humor needs human review.',
             'learned_facts': await db.get_member_facts(1, 200), 'cases': records})

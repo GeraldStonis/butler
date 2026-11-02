@@ -91,20 +91,21 @@ class SpeakerAttributionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(json.loads(second[-1]['content'])['speaker_id'], 200)
         self.assertEqual(json.loads(second[-1]['content'])['channel_id'], 11)
 
-    async def test_actual_ollama_request_retains_current_sender_after_system_merge(self):
+    async def test_actual_groq_request_retains_current_sender_after_system_merge(self):
         await self.seed_screenshot_history()
         text = 'nixi do you remember me?'
         context = await self.context(text)
         original = [dict(m) for m in context]
-        client = SimpleNamespace(chat=AsyncMock(return_value=SimpleNamespace(
-            message=SimpleNamespace(content='Of course, Sir Ronix.'))))
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=AsyncMock(
+            return_value=SimpleNamespace(choices=[SimpleNamespace(
+                message=SimpleNamespace(content='Of course, Sir Ronix.'))])))))
         with patch.object(llm, '_get_client', return_value=client), \
-                patch.object(config, 'OLLAMA_MODEL', 'gpt-oss:120b'):
+                patch.object(config, 'GROQ_MODEL', 'openai/gpt-oss-120b'):
             reply = await conversation.generate_reply(context, 10, text,
                 current_author_id=100, nixi_author_id=999)
         self.assertEqual(reply, 'Of course, Sir Ronix.')
-        client.chat.assert_awaited_once()
-        sent = client.chat.await_args.kwargs['messages']
+        client.chat.completions.create.assert_awaited_once()
+        sent = client.chat.completions.create.await_args.kwargs['messages']
         self.assertEqual(sum(m['role'] == 'system' for m in sent), 1)
         self.assertEqual(json.loads(sent[-1]['content'])['speaker_id'], 100)
         self.assertEqual(json.loads(sent[-1]['content'])['text'], text)

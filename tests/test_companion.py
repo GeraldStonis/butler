@@ -209,12 +209,26 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(c is connections[0] for c in connections))
 
     def test_missing_credentials_are_reported_without_disclosing_values(self):
-        with patch.object(config, 'DISCORD_TOKEN', ''), patch.object(config, 'OWNER_ID', 0), patch.object(config, 'OLLAMA_API_KEY', ''), patch.object(config, 'OLLAMA_HOST', 'https://ollama.com'):
+        with patch.object(config, 'DISCORD_TOKEN', ''), patch.object(config, 'OWNER_ID', 0), patch.object(config, 'GROQ_API_KEY', ''):
             with self.assertRaises(ValueError) as raised:
                 config.validate_runtime()
         self.assertIn('DISCORD_TOKEN', str(raised.exception))
         self.assertIn('OWNER_ID', str(raised.exception))
-        self.assertIn('OLLAMA_API_KEY', str(raised.exception))
+        self.assertIn('GROQ_API_KEY', str(raised.exception))
+
+    def test_runtime_requires_groq_credential_and_model(self):
+        with patch.object(config, 'DISCORD_TOKEN', 'test-discord-token'), patch.object(config, 'OWNER_ID', 1):
+            for key, model, missing in [('', 'openai/gpt-oss-120b', 'GROQ_API_KEY'),
+                                        ('your-groq-api-key', 'openai/gpt-oss-120b', 'GROQ_API_KEY'),
+                                        ('test-groq-credential', '', 'GROQ_MODEL')]:
+                with self.subTest(missing=missing), patch.object(config, 'GROQ_API_KEY', key), patch.object(config, 'GROQ_MODEL', model):
+                    with self.assertRaises(ValueError) as raised:
+                        config.validate_runtime()
+                    self.assertIn(missing, str(raised.exception))
+                    self.assertNotIn('test-discord-token', str(raised.exception))
+                    self.assertNotIn('test-groq-credential', str(raised.exception))
+            with patch.object(config, 'GROQ_API_KEY', 'test-groq-credential'), patch.object(config, 'GROQ_MODEL', 'openai/gpt-oss-120b'):
+                config.validate_runtime()
 
     async def test_setup_hook_registers_extensions_before_gateway_events(self):
         with patch('logging.basicConfig'):
@@ -229,21 +243,28 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class LlmReliabilityTests(unittest.IsolatedAsyncioTestCase):
-    async def test_thinking_is_model_specific_and_empty_response_retries_once(self):
-        client = SimpleNamespace(chat=AsyncMock(side_effect=[SimpleNamespace(message=SimpleNamespace(content='')), SimpleNamespace(message=SimpleNamespace(content='Nixi: Fresh answer.'))]))
-        with patch.object(llm, '_get_client', return_value=client), patch.object(config, 'OLLAMA_MODEL', 'gpt-oss:120b'), patch.object(config, 'OLLAMA_THINKING_LEVEL', 'low'):
+    async def test_reasoning_is_model_specific_and_empty_response_retries_once(self):
+        create = AsyncMock(side_effect=[
+            SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=''))]),
+            SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='Nixi: Fresh answer.'))]),
+        ])
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+        with patch.object(llm, '_get_client', return_value=client), patch.object(config, 'GROQ_MODEL', 'openai/gpt-oss-120b'), patch.object(config, 'GROQ_REASONING_EFFORT', 'low'):
             self.assertEqual(await llm.generate_response([{'role': 'user', 'content': 'hello'}]), 'Fresh answer.')
-        self.assertEqual(client.chat.call_args.kwargs['think'], 'low')
-        self.assertGreaterEqual(client.chat.call_args.kwargs['options']['num_predict'], 1200)
-        client.chat = AsyncMock(return_value=SimpleNamespace(message=SimpleNamespace(content='Fine.')))
-        with patch.object(llm, '_get_client', return_value=client), patch.object(config, 'OLLAMA_MODEL', 'another-model'):
+        self.assertEqual(create.call_args.kwargs['reasoning_effort'], 'low')
+        self.assertGreaterEqual(create.call_args.kwargs['max_completion_tokens'], 1200)
+        create = AsyncMock(return_value=SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='Fine.'))]))
+        client.chat.completions.create = create
+        with patch.object(llm, '_get_client', return_value=client), patch.object(config, 'GROQ_MODEL', 'llama-3.3-70b-versatile'):
             await llm.generate_response([{'role': 'user', 'content': 'hello'}])
-        self.assertNotIn('think', client.chat.call_args.kwargs)
+        self.assertNotIn('reasoning_effort', create.call_args.kwargs)
+        self.assertNotIn('include_reasoning', create.call_args.kwargs)
 
     async def test_timeout_is_bounded_and_does_not_expose_provider_error(self):
         async def slow(**kwargs):
             await asyncio.sleep(1)
-        with patch.object(llm, '_get_client', return_value=SimpleNamespace(chat=slow)), patch.object(config, 'LLM_TIMEOUT_SECONDS', 0.01), self.assertLogs('nixi.llm', level='WARNING'):
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=slow)))
+        with patch.object(llm, '_get_client', return_value=client), patch.object(config, 'LLM_TIMEOUT_SECONDS', 0.01), self.assertLogs('nixi.llm', level='WARNING'):
             self.assertEqual(await llm.generate_response([{'role': 'user', 'content': 'hello'}], failure_reply=''), '')
 
     def test_cloud_json_parser_accepts_fences_but_not_invalid_output(self):
@@ -253,6 +274,7 @@ class LlmReliabilityTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_speaker_envelopes_are_not_delivered_to_discord(self):
         payload = json.dumps({'speaker': 'Nixi', 'id': 99, 'text': 'A proper visible answer.'})
-        client = SimpleNamespace(chat=AsyncMock(return_value=SimpleNamespace(message=SimpleNamespace(content=payload))))
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=AsyncMock(
+            return_value=SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=payload))])))))
         with patch.object(llm, '_get_client', return_value=client):
             self.assertEqual(await llm.generate_response([{'role': 'user', 'content': 'hello'}]), 'A proper visible answer.')

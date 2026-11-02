@@ -42,7 +42,7 @@ async def probe() -> None:
                                                          guild_id=1, current_author_id=guest_id, nixi_author_id=99)
                     reply = await conversation.generate_reply(context, 1, text, nixi_author_id=99)
                 print(json.dumps({"input": text, "reply": reply,
-                                  "model": config.OLLAMA_MODEL,
+                                  "provider": "groq", "model": config.GROQ_MODEL,
                                   "elapsed_seconds": round(time.perf_counter() - started, 2),
                                   "latin_script_reply": not has_non_latin_prose(reply)}, ensure_ascii=True), flush=True)
                 await db.save_message(1, 1, 99, "Nixi", reply, True)
@@ -54,7 +54,7 @@ async def probe() -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--live", action="store_true", help="Use the configured Ollama API; never posts to Discord.")
+    parser.add_argument("--live", action="store_true", help="Use the configured Groq API; never posts to Discord.")
     args = parser.parse_args()
     if not args.live:
         parser.error("Pass --live to opt into actual LLM requests.")

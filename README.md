@@ -3,6 +3,8 @@
 Nixi is a persona-driven Discord bot that acts as a private butler for the
 owner and a conversational character for everyone else.
 
+Text generation runs through the Groq API using the official async Python SDK.
+
 For a beginner-friendly explanation of the architecture, every feature, and the
 engineering tradeoffs, read the [project walkthrough](PROJECT_WALKTHROUGH.md).
 
@@ -370,12 +372,13 @@ the evidence. Resets cancel pending summaries before clearing the channel.
 
 ### Context Selection
 
-The rolling database buffer and the model's context window are different things.
-Previously, only the newest 35 messages and 10,000 characters of history were sent,
-even when more messages were stored. The defaults now retain about 200 raw messages
-(summarizing a 50-message batch after 250), and select up to 100 historical messages
-within a shared 48,000-character budget. These are characters, not tokens; the
-persona, current request and personal settings are separate from that history budget.
+The rolling database buffer, selected history and model context window have
+different limits. The defaults retain about 200 raw messages (summarizing a
+50-message batch after 250), and select up to 100 historical messages within a
+shared 4,000-character budget. These are characters, not tokens; the persona,
+current request and personal settings are separate from that history budget.
+The smaller history budget leaves room for the persona and reply under smaller
+Groq account token-per-minute (TPM) quotas while keeping adaptive recall and summaries.
 
 Selection is adaptive and local, with no extra LLM request: greetings use the latest
 12 messages; ordinary chat starts with 40 recent turns and up to 12 older relevant
@@ -397,16 +400,17 @@ messages remain context, not a queue of people to answer in the same reply.
 The reply's language is taken from the original message text, not JSON metadata
 or another member's name. This applies to normal chat and `/ask`, including a
 novelty retry; it adds no model calls, schema migrations or environment settings.
-Rolling summaries keep up to 800 words/6,000 characters of specifics, speaker IDs,
+Rolling summaries store up to 800 words/6,000 characters of specifics, speaker IDs,
 plans and corrections, merging old and new material in a single background call.
-Summary and pinned-reference text share the history budget.
+Only a bounded excerpt enters a reply prompt. Summary and pinned-reference text
+share the history budget.
 
-[GPT-OSS 120B supports a 131,072-token context](https://developers.openai.com/api/docs/models/gpt-oss-120b).
-[Ollama Cloud already allocates maximum context](https://docs.ollama.com/context-length);
-`num_ctx` is not a missing switch we need to add. Filling that entire window on
-every greeting would increase payload and processing work without useful recall.
-The wider limits send more server/member chat to the existing Ollama Cloud model;
-keep or lower them if you do not want that additional sharing. Local logs report
+[Groq's GPT-OSS 120B supports a 131,072-token context](https://console.groq.com/docs/models).
+[Account token limits](https://console.groq.com/docs/rate-limits) can be much
+smaller than that model window. Choose any larger history budget to fit your
+account's TPM quota, allowing for the full prompt, requested completion and other
+model calls. A character budget does not guarantee a particular token count.
+Increasing it also sends more server/member chat to Groq. Local logs report
 considered/selected/recalled counts, history characters and provider-reported input
 tokens when available, never the raw conversation.
 
@@ -414,13 +418,13 @@ tokens when available, never the raw conversation.
 CONTEXT_WINDOW_SIZE=200
 SUMMARY_THRESHOLD=50
 CONTEXT_MESSAGE_LIMIT=100
-CONTEXT_CHAR_BUDGET=48000
+CONTEXT_CHAR_BUDGET=4000
 ```
 
 Set these values in Railway Variables too when replacing old explicit limits;
 changing local `.env` does not update Railway. No database migration or new API
 key is needed. Increasing history does not increase the visible reply length or
-reasoning level; more input can still add latency on genuinely large requests.
+reasoning level; more input consumes quota and can add latency on large requests.
 
 ## Setup
 
@@ -436,7 +440,7 @@ Copy `.env.example` to `.env` and fill in the required values:
 
 ```env
 DISCORD_TOKEN=your-bot-token-here
-OLLAMA_API_KEY=your-ollama-api-key
+GROQ_API_KEY=your-groq-api-key
 OWNER_ID=your-discord-user-id
 ```
 
@@ -766,9 +770,13 @@ Railway can run this as a worker using the included `Procfile` or
 DB_PATH=/data/nixi.db
 ```
 
-New settings have defaults; do not replace your existing Railway variables or
-check `.env` into Git. The new preference table is created automatically in the
-existing database. Upgrade dependencies during redeployment (`ollama>=0.6.2`).
+Set `GROQ_API_KEY` in Railway Variables, with `GROQ_MODEL=openai/gpt-oss-120b`
+and `GROQ_REASONING_EFFORT=low`, then redeploy with the updated requirements.
+The bot uses the official `groq` Python SDK (`groq>=1.0.0,<2.0.0`). Old
+`OLLAMA_API_KEY`, `OLLAMA_HOST`, `OLLAMA_MODEL` and `OLLAMA_THINKING_LEVEL`
+settings are no longer used. Keep the other service variables and existing
+database volume. Do not check `.env` into Git; the local file is not uploaded
+to Railway. The preference table is created automatically in the existing database.
 
 The included [Nixpacks install override](https://nixpacks.com/docs/configuration/file)
 creates the build virtualenv and runs `scripts/install_dependencies.py` with that
@@ -792,26 +800,27 @@ containing secrets or commit `.env`; keep credentials in your Railway variables.
 
 ## Model Tuning And Checks
 
-GPT-OSS 120B is the default, served through the existing Ollama Cloud API and key.
-Use `OLLAMA_MODEL=gpt-oss:120b` with `OLLAMA_HOST=https://ollama.com`; no local
-model download or Railway GPU is needed. The cloud API uses the model name from
-its catalog, not the CLI's `:cloud` suffix. See [Ollama Cloud](https://docs.ollama.com/cloud).
-Free-plan access has usage limits; it is not unlimited inference.
+GPT-OSS 120B is the default, served through the Groq API with `GROQ_API_KEY`.
+Use `GROQ_MODEL=openai/gpt-oss-120b`; no local model download or Railway GPU is
+needed. Requests use the official SDK's default Groq endpoint. Choose a model
+ID from [Groq's supported model catalog](https://console.groq.com/docs/models).
+Account usage and rate limits still apply; see [Groq rate limits](https://console.groq.com/docs/rate-limits).
 
-Set `OLLAMA_THINKING_LEVEL=low` for latency-sensitive conversation. GPT-OSS uses
-[named reasoning levels](https://docs.ollama.com/capabilities/thinking), not a
-boolean: `medium`/`high` remain available, but can take longer. Blank, invalid or
-leftover Gemma boolean values safely select `low`, not the provider's medium
-default. Gemma remains compatible if deliberately selected; it uses boolean
-thinking instead. Clear, direct prompts follow [official OpenAI guidance](https://developers.openai.com/api/docs/guides/reasoning-best-practices)
-without asking for a long step-by-step thought process.
+Set `GROQ_REASONING_EFFORT=low` for latency-sensitive conversation. GPT-OSS
+supports [low, medium and high reasoning effort](https://console.groq.com/docs/reasoning);
+`medium`/`high` can take longer. Blank or invalid settings select `low`. The
+reasoning setting is sent only for GPT-OSS models. Prompts stay direct and do
+not ask the model to expose a long step-by-step thought process.
 
-For Railway, set `OLLAMA_MODEL=gpt-oss:120b` and `OLLAMA_THINKING_LEVEL=low`
-in service Variables, then redeploy. Existing Railway variables override the
-project defaults; the ignored local `.env` is not uploaded with the code.
+For Railway, configure the Groq key, model and reasoning effort in service
+Variables, then redeploy. Existing Railway variables override the project
+defaults; the ignored local `.env` is not uploaded with the code.
 
 Calls have a 45-second total deadline and three-request concurrency limit. Empty
-final answers get at most one larger-budget retry. Short GPT-OSS requests have a
+final answers get at most one larger-budget retry. Temporary connection failures
+and HTTP 408/409/429/5xx errors can also retry within the same two-attempt cap and
+deadline. Valid, finite Retry-After waits are honored when they fit the remaining deadline;
+SDK retries are disabled. Short GPT-OSS requests have a
 512-token minimum budget for reasoning plus final output, reducing empty answers
 from reasoning-only truncation; it is a ceiling, not a required response length.
 Clear greetings, acknowledgements and straightforward self-reports bypass
@@ -827,9 +836,9 @@ already-sent reply. Delayed media keeps the text already shown, rechecks member
 preferences, and leaves it alone if the message was deleted or Discord rejects
 the edit. Explicit media/owner errands still wait for their requested result.
 Logs record model, response latency and attempt count, never private reasoning.
-Reasoning traces and accidental speaker envelopes are not sent to Discord. Ollama Cloud currently
-does not support [schema-enforced output](https://docs.ollama.com/capabilities/structured-outputs),
-so JSON is parsed and checked locally rather than enabling an unsupported format.
+GPT-OSS calls set `include_reasoning=false`; reasoning traces and accidental
+speaker envelopes are not sent to Discord. Internal JSON is parsed and checked
+locally; this migration keeps the existing service response contract.
 
 ```bash
 python -m unittest discover -s tests -q

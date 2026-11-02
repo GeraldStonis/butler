@@ -90,7 +90,7 @@ async def on_ready() -> None:
     log.info("Nixi is at your service.")
     log.info("Logged in as %s (ID: %d)", bot.user, bot.user.id)
     log.info("Owner ID: %d", config.OWNER_ID)
-    log.info("LLM model: %s", config.OLLAMA_MODEL)
+    log.info("LLM provider: Groq; model: %s", config.GROQ_MODEL)
     log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
     # Initialise database

@@ -53,13 +53,12 @@ OWNER_AWAY_AFTER_SECONDS: int = int(os.environ.get("OWNER_AWAY_AFTER_SECONDS", "
 # Legacy name: enables public natural-language tools as well as owner tools.
 ENABLE_NATURAL_OWNER_ACTIONS: bool = _bool_env("ENABLE_NATURAL_OWNER_ACTIONS", True)
 
-# LLM (Ollama Cloud)
-OLLAMA_HOST: str = os.environ.get("OLLAMA_HOST", "https://ollama.com")
-OLLAMA_API_KEY: str = os.environ.get("OLLAMA_API_KEY", "")
-OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "gpt-oss:120b")
+# LLM (Groq)
+GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY", "").strip()
+GROQ_MODEL: str = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b").strip()
 LLM_TIMEOUT_SECONDS: float = max(5, float(os.environ.get("LLM_TIMEOUT_SECONDS", "45")))
 LLM_MAX_CONCURRENT: int = max(1, int(os.environ.get("LLM_MAX_CONCURRENT", "3")))
-OLLAMA_THINKING_LEVEL: str = os.environ.get("OLLAMA_THINKING_LEVEL", "low").strip().lower()
+GROQ_REASONING_EFFORT: str = os.environ.get("GROQ_REASONING_EFFORT", "low").strip().lower()
 
 # Database
 DB_PATH: str = os.environ.get("DB_PATH", "nixi.db")
@@ -68,7 +67,8 @@ DB_PATH: str = os.environ.get("DB_PATH", "nixi.db")
 CONTEXT_WINDOW_SIZE: int = int(os.environ.get("CONTEXT_WINDOW_SIZE", "200"))
 SUMMARY_THRESHOLD: int = int(os.environ.get("SUMMARY_THRESHOLD", "50"))
 CONTEXT_MESSAGE_LIMIT: int = max(4, int(os.environ.get("CONTEXT_MESSAGE_LIMIT", "100")))
-CONTEXT_CHAR_BUDGET: int = max(2000, int(os.environ.get("CONTEXT_CHAR_BUDGET", "48000")))
+# Leave room for persona/instructions and output under smaller Groq account quotas.
+CONTEXT_CHAR_BUDGET: int = max(2000, int(os.environ.get("CONTEXT_CHAR_BUDGET", "4000")))
 FOLLOWUP_WINDOW_SECONDS: int = max(0, int(os.environ.get("FOLLOWUP_WINDOW_SECONDS", "90")))
 OWNER_MENTION_COOLDOWN_SECONDS: int = max(0, int(os.environ.get("OWNER_MENTION_COOLDOWN_SECONDS", "600")))
 
@@ -153,7 +153,9 @@ def validate_runtime() -> None:
         missing.append("DISCORD_TOKEN")
     if OWNER_ID <= 0:
         missing.append("OWNER_ID (numeric Discord user ID)")
-    if OLLAMA_HOST.rstrip("/") == "https://ollama.com" and (not OLLAMA_API_KEY or OLLAMA_API_KEY == "your-ollama-api-key"):
-        missing.append("OLLAMA_API_KEY")
+    if not GROQ_API_KEY or GROQ_API_KEY == "your-groq-api-key":
+        missing.append("GROQ_API_KEY")
+    if not GROQ_MODEL:
+        missing.append("GROQ_MODEL")
     if missing:
         raise ValueError("Missing required environment settings: " + ", ".join(missing))

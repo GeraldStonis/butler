@@ -103,11 +103,12 @@ class VisibleResponseTests(unittest.IsolatedAsyncioTestCase):
     async def test_internal_json_is_not_rewritten_or_given_speech_instructions(self):
         context = [{'role': 'system', 'content': 'Return JSON only.'}]
         raw = '{"name":"\u0905"}'
-        client = SimpleNamespace(chat=AsyncMock(return_value=SimpleNamespace(message=SimpleNamespace(content=raw))))
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=AsyncMock(
+            return_value=SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=raw))])))))
         with patch.object(llm, '_get_client', return_value=client):
             self.assertEqual(await llm.generate_response(context), raw)
-        self.assertEqual(client.chat.await_args.kwargs['messages'], context)
-        client.chat.assert_awaited_once()
+        self.assertEqual(client.chat.completions.create.await_args.kwargs['messages'], context)
+        client.chat.completions.create.assert_awaited_once()
 
     async def test_guest_refusal_uses_the_same_script_repair(self):
         with patch.object(llm, 'generate_response', AsyncMock(side_effect=['\u0905\u092c bas.', 'bhai, ye order counter band hai.'])) as model:

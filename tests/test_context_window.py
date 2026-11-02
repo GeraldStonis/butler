@@ -164,8 +164,10 @@ class ContextWindowTests(unittest.IsolatedAsyncioTestCase):
 
 class ContextUsageLoggingTests(unittest.IsolatedAsyncioTestCase):
     async def test_usage_logs_counts_without_logging_private_prompt_text(self):
-        client = SimpleNamespace(chat=AsyncMock(return_value=SimpleNamespace(
-            message=SimpleNamespace(content='A reply.'), prompt_eval_count=1234, eval_count=56)))
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=AsyncMock(
+            return_value=SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content='A reply.'))],
+                usage=SimpleNamespace(prompt_tokens=1234, completion_tokens=56))))))
         with patch.object(llm, '_get_client', return_value=client), self.assertLogs('nixi.llm', level='INFO') as logs:
             await llm.generate_response([{'role': 'user', 'content': 'Private conversation text'}])
         text = ' '.join(logs.output)
